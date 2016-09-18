@@ -1,0 +1,3 @@
+version=2
+opts=filenamemangle=s/.+\/v?(\d\S*)\.tar\.gz/bucklespring-$1\.tar\.gz/ \
+  https://github.com/zevv/bucklespring/tags .*/v?(\d\S*)\.tar\.gz
