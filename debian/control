@@ -10,7 +10,7 @@ Vcs-Browser: https://anonscm.debian.org/cgit/collab-maint/buckle.git
 
 Package: bucklespring
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, bucklespring-data
 Description: Nostalgia bucklespring keyboard sound
  Buckle emulates the sound of an old IBM Model-M space saver
  bucklespring keyboard while typing within an X session.
@@ -20,3 +20,17 @@ Description: Nostalgia bucklespring keyboard sound
  The sound of each key has carefully been sampled, and is played back
  while simulating the proper distance and direction for a realistic 3D
  sound palette of pure nostalgic bliss.
+
+Package: bucklespring-data
+Architecture: all
+Description: Nostalgia bucklespring keyboard sound - sound files
+ Buckle emulates the sound of an old IBM Model-M space saver
+ bucklespring keyboard while typing within an X session.
+ .
+ It runs as a background process and plays back the sound of each key
+ pressed and released on the keyboard, just as if using an IBM Model-M.
+ The sound of each key has carefully been sampled, and is played back
+ while simulating the proper distance and direction for a realistic 3D
+ sound palette of pure nostalgic bliss.
+ .
+ This package contains the keyboard sound files.
