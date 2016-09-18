@@ -1,4 +1,4 @@
-Source: buckle
+Source: bucklespring
 Section: games
 Priority: optional
 Maintainer: Dominik George <nik@naturalnet.de>
@@ -8,7 +8,7 @@ Homepage: https://github.com/zevv/bucklespring
 Vcs-Git: https://anonscm.debian.org/collab-maint/buckle.git
 Vcs-Browser: https://anonscm.debian.org/cgit/collab-maint/buckle.git
 
-Package: buckle
+Package: bucklespring
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Nostalgia bucklespring keyboard sound
