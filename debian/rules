@@ -1,0 +1,6 @@
+#!/usr/bin/make -f
+
+export PATH_AUDIO=/usr/share/buckle/wav
+
+%:
+	dh $@

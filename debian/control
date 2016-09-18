@@ -1,0 +1,22 @@
+Source: buckle
+Section: games
+Priority: optional
+Maintainer: Dominik George <nik@naturalnet.de>
+Build-Depends: debhelper (>= 9), libopenal-dev, libalure-dev, libxtst-dev
+Standards-Version: 3.9.8
+Homepage: https://github.com/zevv/bucklespring
+Vcs-Git: https://anonscm.debian.org/collab-maint/buckle.git
+Vcs-Browser: https://anonscm.debian.org/cgit/collab-maint/buckle.git
+
+Package: buckle
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Nostalgia bucklespring keyboard sound
+ Buckle emulates the sound of an old IBM Model-M space saver
+ bucklespring keyboard while typing within an X session.
+ .
+ It runs as a background process and plays back the sound of each key
+ pressed and released on the keyboard, just as if using an IBM Model-M.
+ The sound of each key has carefully been sampled, and is played back
+ while simulating the proper distance and direction for a realistic 3D
+ sound palette of pure nostalgic bliss.

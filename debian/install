@@ -1,0 +1,2 @@
+buckle usr/games
+wav/* usr/share/buckle/wav
