@@ -1,3 +1,9 @@
+bucklespring (1.3.6-2) UNRELEASED; urgency=medium
+
+  * Fix VCS-Git URL.
+
+ -- Dominik George <nik@naturalnet.de>  Mon, 03 Oct 2016 14:19:23 +0200
+
 bucklespring (1.3.6-1) unstable; urgency=medium
 
   * Initial release (Closes: #838226)
