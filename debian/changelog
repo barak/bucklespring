@@ -1,4 +1,4 @@
-bucklespring (1.4.0-1) UNRELEASED; urgency=medium
+bucklespring (1.4.0-1) unstable; urgency=medium
 
   * New upstream release.
      + Add mute function.
