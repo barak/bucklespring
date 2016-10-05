@@ -1,10 +1,11 @@
 
-VERSION	:= 1.3.6
 NAME   	:= buckle
 SRC 	:= main.c scan-linux.c scan-windows.c scan-mac.c
+VERSION	:= 1.4.0
 
 PATH_AUDIO ?= "./wav"
 
+CFLAGS  += $(CPPFLAGS)
 CFLAGS  += -Wall -Werror 
 CFLAGS  += -DVERSION=\"$(VERSION)\"
 CFLAGS  += -DPATH_AUDIO=\"$(PATH_AUDIO)\"
@@ -35,7 +36,7 @@ endif
 
 OBJS    = $(subst .c,.o, $(SRC))
 CC 	= $(CROSS)gcc
-LD 	= $(CROSS)g++
+LD 	= $(CROSS)gcc
 STRIP 	= $(CROSS)strip
 
 %.o: %.c

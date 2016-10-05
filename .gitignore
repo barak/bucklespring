@@ -1,0 +1,4 @@
+*.swp
+*.o
+cscope.out
+buckle
