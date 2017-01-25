@@ -1,4 +1,4 @@
-Subject: Allow build on Hurd and kFreeBSD as well
+Subject: Allow build on Hurd, FreeBSD and GNU/kFreeBSD as well
  Actually, upstream meant to check for X11, not for Linux, but…
 From: Dominik George <nik@naturalnet.de>
 Bug-Debian: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=852557
@@ -7,7 +7,7 @@ Bug-Debian: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=852557
 @@ -1,5 +1,5 @@
  
 -#ifdef linux
-+#if defined (linux) || defined (__GNU__) || defined (__FreeBSD__)
++#if defined (linux) || defined (__GNU__) || defined (__FreeBSD__) || defined (__FreeBSD_kernel__)
  
  #include <stdio.h>
  
