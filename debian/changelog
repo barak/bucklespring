@@ -1,3 +1,9 @@
+bucklespring (1.4.0-2) unstable; urgency=medium
+
+  * Allow build on non-linux architectures. (Closes: #852557)
+
+ -- Dominik George <nik@naturalnet.de>  Wed, 25 Jan 2017 14:53:29 +0100
+
 bucklespring (1.4.0-1) unstable; urgency=medium
 
   * New upstream release.
