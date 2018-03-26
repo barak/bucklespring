@@ -4,6 +4,8 @@ Priority: optional
 Maintainer: Debian QA Group <packages@qa.debian.org>
 Build-Depends: debhelper (>= 10), pkgconf, libopenal-dev, libalure-dev, libxtst-dev
 Standards-Version: 3.9.8
+Vcs-Git: https://salsa.debian.org/debian/bucklespring.git
+Vcs-Browser: https://salsa.debian.org/debian/bucklespring
 Homepage: https://github.com/zevv/bucklespring
 
 Package: bucklespring
