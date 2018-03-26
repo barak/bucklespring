@@ -1,8 +1,9 @@
 bucklespring (1.4.0-4) UNRELEASED; urgency=medium
 
   * Move to Salsa.
+  * Update my mail address
 
- -- Dominik George <natureshadow@debian.org>  Mon, 26 Mar 2018 15:02:27 +0200
+ -- Dominik George <natureshadow@debian.org>  Mon, 26 Mar 2018 15:02:45 +0200
 
 bucklespring (1.4.0-3) unstable; urgency=medium
 
