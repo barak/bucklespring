@@ -24,6 +24,7 @@ Description: Nostalgia bucklespring keyboard sound
 Package: bucklespring-data
 Architecture: all
 Depends: ${misc:Depends}
+Multi-Arch: foreign
 Description: Nostalgia bucklespring keyboard sound - sound files
  Buckle emulates the sound of an old IBM Model-M space saver
  bucklespring keyboard while typing within an X session.

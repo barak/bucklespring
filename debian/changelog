@@ -1,7 +1,12 @@
 bucklespring (1.4.0-4) UNRELEASED; urgency=medium
 
-  * Move to Salsa.
-  * Update my mail address
+  [ Dominik George ]
+   * Move to Salsa.
+   * Update my mail address.
+
+  [ Debian Janitor ]
+  * Apply multi-arch hints.
+    + bucklespring-data: Add Multi-Arch: foreign.
 
  -- Dominik George <natureshadow@debian.org>  Mon, 26 Mar 2018 15:02:45 +0200
 
