@@ -1,3 +1,13 @@
+bucklespring (1.4.0-3) unstable; urgency=medium
+
+  * QA upload.
+  * Update Maintainer to QA group
+  * Delete obsolete Vcs-* URIs
+  * d/control: switch from pkg-config to pkgconf
+  * Remove overrides for obsolete lintian tags
+
+ -- Chris Hofstaedtler <zeha@debian.org>  Fri, 02 May 2025 13:59:47 +0200
+
 bucklespring (1.4.0-2) unstable; urgency=medium
 
   * Allow build on non-linux architectures. (Closes: #852557)
