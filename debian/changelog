@@ -8,6 +8,10 @@ bucklespring (1.4.0-4) UNRELEASED; urgency=medium
   * Apply multi-arch hints.
     + bucklespring-data: Add Multi-Arch: foreign.
 
+  [ Helmut Grohne ]
+  * Fix FTCBFS: hard codes build architecture build tools
+    Closes: #958133
+
  -- Dominik George <natureshadow@debian.org>  Mon, 26 Mar 2018 15:02:45 +0200
 
 bucklespring (1.4.0-3) unstable; urgency=medium

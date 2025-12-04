@@ -1,0 +1,49 @@
+Author: Helmut Grohne <helmut@subdivi.de>
+Bug-Debian: https://bugs.debian.org/958133
+Description: Fix FTCBFS: hard codes build architecture build tools
+Last-Update: 2020-04-18
+
+--- bucklespring-1.4.0.orig/Makefile
++++ bucklespring-1.4.0/Makefile
+@@ -5,6 +5,7 @@
+ 
+ PATH_AUDIO ?= "./wav"
+ 
++PKG_CONFIG ?= $(CROSS)pkg-config
+ CFLAGS  += $(CPPFLAGS)
+ CFLAGS  += -Wall -Werror 
+ CFLAGS  += -DVERSION=\"$(VERSION)\"
+@@ -24,19 +25,19 @@
+  ifeq ($(OS), Darwin)
+   BIN     := $(NAME)
+   PKG_CONFIG_PATH := "./mac/lib/pkgconfig" 
+-  LDFLAGS += $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs alure openal)
+-  CFLAGS  += $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags alure openal)
++  LDFLAGS += $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) $(PKG_CONFIG) --libs alure openal)
++  CFLAGS  += $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) $(PKG_CONFIG) --cflags alure openal)
+   LDFLAGS  += -framework ApplicationServices -framework OpenAL
+  else
+   BIN     := $(NAME)
+-  LDFLAGS += $(shell pkg-config --libs openal alure xtst x11)
+-  CFLAGS  += $(shell pkg-config --cflags openal alure xtst x11)
++  LDFLAGS += $(shell $(PKG_CONFIG) --libs openal alure xtst x11)
++  CFLAGS  += $(shell $(PKG_CONFIG) --cflags openal alure xtst x11)
+  endif
+ endif
+ 
+ OBJS    = $(subst .c,.o, $(SRC))
+ CC 	= $(CROSS)gcc
+-LD 	= $(CROSS)gcc
++LD 	= $(CC)
+ STRIP 	= $(CROSS)strip
+ 
+ %.o: %.c
+@@ -52,7 +53,7 @@
+ 	rm -rf $(NAME)-$(VERSION)
+ 
+ rec: rec.c
+-	gcc -Wall -Werror rec.c -o rec
++	$(CC) -Wall -Werror rec.c -o rec
+ 
+ clean:
+ 	rm -f $(OBJS) $(BIN) core rec
