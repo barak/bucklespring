@@ -1,2 +1,2 @@
-build_non_linux.patch
+# build_non_linux.patch
 cross.patch
