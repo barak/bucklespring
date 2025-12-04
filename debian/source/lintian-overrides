@@ -1,2 +1,2 @@
 # Upstream does not sign tarballs. Discussing that, though.
-bucklespring source: debian-watch-may-check-gpg-signature
+bucklespring source: debian-watch-does-not-check-openpgp-signature
