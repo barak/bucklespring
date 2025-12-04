@@ -1,4 +1,4 @@
-bucklespring (1.4.0-4) UNRELEASED; urgency=medium
+bucklespring (1.5.1-1) UNRELEASED; urgency=medium
 
   [ Dominik George ]
    * Move to Salsa.
@@ -14,8 +14,9 @@ bucklespring (1.4.0-4) UNRELEASED; urgency=medium
 
   [ Andreas Tille ]
   * d/watch: Version=5
+  * New upstream version
 
- -- Dominik George <natureshadow@debian.org>  Mon, 26 Mar 2018 15:02:45 +0200
+ -- Andreas Tille <tille@debian.org>  Thu, 04 Dec 2025 09:58:22 +0100
 
 bucklespring (1.4.0-3) unstable; urgency=medium
 
