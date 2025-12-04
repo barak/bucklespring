@@ -16,6 +16,7 @@ bucklespring (1.5.1-1) UNRELEASED; urgency=medium
   * d/watch: Version=5
   * New upstream version
   * Standards-Version: 4.7.2 (routine-update)
+  * debhelper-compat 13 (routine-update)
 
  -- Andreas Tille <tille@debian.org>  Thu, 04 Dec 2025 09:58:22 +0100
 
