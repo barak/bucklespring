@@ -1,6 +1,3 @@
-
-#ifdef linux
-
 #include <stdio.h>
 
 #include <X11/XKBlib.h>
@@ -10,7 +7,7 @@
 
 void key_pressed_cb(XPointer arg, XRecordInterceptData *d);
 
-int scan(void)
+int scan(int verbose)
 {
 	/* Initialize and start Xrecord context */
 	
@@ -33,7 +30,7 @@ int scan(void)
 	}
 
 	rr->device_events.first = KeyPress;
-	rr->device_events.last = KeyRelease;
+	rr->device_events.last = ButtonReleaseMask;
 	rcs = XRecordAllClients;
 
 	rc = XRecordCreateContext (dpy, 0, &rcs, 1, &rr, 1);
@@ -79,6 +76,14 @@ void key_pressed_cb(XPointer arg, XRecordInterceptData *d)
 			case KeyRelease:
 				play(key, 0);
 				break;
+			case ButtonPress:
+				if(key == -5 || key == -7)
+					play(0xff, 1);
+				break;
+			case ButtonRelease:
+				if(key == -5 || key == -7)
+					play(0xff, 0);
+				break;
 			default:
 				break;
 		}
@@ -91,6 +96,3 @@ void key_pressed_cb(XPointer arg, XRecordInterceptData *d)
 void open_console(void)
 {
 }
-
-#endif
-

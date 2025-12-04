@@ -8,8 +8,8 @@
 #include <unistd.h>
 #include <limits.h>
 #include <stdbool.h>
+#include <getopt.h>
 #include <time.h>
-
 
 #ifdef __APPLE__
 #include <OpenAL/al.h>
@@ -43,16 +43,28 @@ static double find_key_loc(int code);
  */
 
 static int keyloc[][32] = {
-	{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x6e, 0x66, 0x68, 0x1c, -1 },
-	{ 0x01, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x40, 0x41, 0x42, 0x43, 0x44, 0x57, 0x58, 0x6f, 0x6b, 0x6d, -1 },
-	{ 0x29, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, -1 },
-	{ 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x2b,-1 },
-	{ 0x3a, 0x1e, 0x1f, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x1c, -1 },
-	{ 0x2a, 0x2c, 0x2d, 0x2e, 0x2f, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, -1 },
+	{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x6e, 0x66, 0x68, 0x1c, 0x45, 0x62, 0x37, 0x4a, -1 },
+	{ 0x01, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x40, 0x41, 0x42, 0x43, 0x44, 0x57, 0x58, 0x6f, 0x6b, 0x6d, 0x47, 0x48, 0x49, 0x4e, -1 },
+	{ 0x29, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x4b, 0x4c, 0x4d, -1 },
+	{ 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x2b, 0x4f, 0x50, 0x51, 0x60, -1 },
+	{ 0x3a, 0x1e, 0x1f, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x1c, 0x52, 0x53, -1 },
+	{ 0x2a, 0x56, 0x2c, 0x2d, 0x2e, 0x2f, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, -1 },
 	{ 0x1d, 0x7d, 0x5b, 0x38, 0x39, 0x64, 0x61, 0x67, -1 },
 	{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x69, 0x6c, 0x6a, -1 },
 };
 
+/* 
+ * Horizontal position on keyboard of the pragmatic center of the row, since keys come in different sizes and shapes
+ */
+static double midloc[] = {
+	7.5,
+	7.5,
+	7.5,
+	6.5,
+	6.5,
+	6.5,
+	4.5,
+};
 
 static int opt_verbose = 0;
 static int opt_stereo_width = 50;
@@ -64,12 +76,32 @@ static const char *opt_path_audio = PATH_AUDIO;
 static int muted = 0;
 
 
+static const char short_opts[] = "d:fg:hlm:Mp:s:v";
+
+static const struct option long_opts[] = {
+	{ "device",         required_argument, NULL, 'd' },
+	{ "fallback-sound", no_argument,       NULL, 'f' },
+	{ "gain",           required_argument, NULL, 'g' },
+	{ "help",           no_argument,       NULL, 'h' },
+	{ "list-devices",   no_argument,       NULL, 'l' },
+	{ "mute-keycode",   required_argument, NULL, 'm' },
+	{ "mute",           no_argument,       NULL, 'M' },
+	{ "audio-path",     required_argument, NULL, 'p' },
+	{ "stereo-width",   required_argument, NULL, 'w' },
+	{ "verbose",        no_argument,       NULL, 'v' },
+        { 0, 0, 0, 0 }
+};
+
+
+
 int main(int argc, char **argv)
 {
 	int c;
 	int rv = EXIT_SUCCESS;
+	int idx;
 
-	while( (c = getopt(argc, argv, "fhm:vd:g:lp:s:")) != EOF) {
+	while( (c = getopt_long(argc, argv, 
+			       short_opts, long_opts, &idx)) != -1) {
 		switch(c) {
 			case 'd':
 				opt_device = optarg;
@@ -89,14 +121,17 @@ int main(int argc, char **argv)
 			case 'm':
 				opt_mute_keycode = strtol(optarg, NULL, 0);
 				break;
-			case 'v':
-				opt_verbose++;
+			case 'M':
+				muted = !muted;
 				break;
 			case 'p':
 				opt_path_audio = optarg;
 				break;
 			case 's':
 				opt_stereo_width = atoi(optarg);
+				break;
+			case 'v':
+				opt_verbose++;
 				break;
 			default:
 				usage(argv[0]);
@@ -135,12 +170,22 @@ int main(int argc, char **argv)
 		return -1;
 	}
 	TEST_ERROR("make default context");
-		
+
 	alListener3f(AL_POSITION, 0, 0, 0);
 	alListener3f(AL_VELOCITY, 0, 0, 0);
 	alListenerfv(AL_ORIENTATION, listenerOri);
 
-	scan();
+	/* Path to data files can also be specified by environment, this is
+	 * used by the snap package */
+
+	const char *env_path = getenv("BUCKLESPRING_WAV_DIR");
+	if (env_path) {
+		opt_path_audio = env_path;
+	}
+
+	printd("Using wav dir: \"%s\"\n", opt_path_audio);
+
+	scan(opt_verbose);
 
 out:
 	device = alcGetContextsDevice(context);
@@ -160,15 +205,16 @@ static void usage(char *exe)
 		"\n"
 		"options:\n"
 		"\n"
-		"  -d DEVICE use OpenAL audio device DEVICE\n"
-		"  -f        use a fallback sound for unknown keys\n"
-		"  -g GAIN   set playback gain [0..100]\n"
-		"  -m CODE   use CODE as mute key (default 0x46 for scroll lock)\n"
-		"  -h        show help\n"
-		"  -l        list available openAL audio devices\n"
-		"  -p PATH   load .wav files from directory PATH\n"
-		"  -s WIDTH  set stereo width [0..100]\n"
-		"  -v        increase verbosity / debugging\n",
+		"  -d, --device=DEVICE       use OpenAL audio device DEVICE\n"
+		"  -f, --fallback-sound      use a fallback sound for unknown keys\n"
+		"  -g, --gain=GAIN           set playback gain [0..100]\n"
+		"  -m, --mute-keycode=CODE   use CODE as mute key (default 0x46 for scroll lock)\n"
+		"  -M, --mute                start the program muted\n"
+		"  -h, --help                show help\n"
+		"  -l, --list-devices        list available openAL audio devices\n"
+		"  -p, --audi-path=PATH      load .wav files from directory PATH\n"
+		"  -s, --stereo-width=WIDTH  set stereo width [0..100]\n"
+		"  -v, --verbose             increase verbosity / debugging\n",
 		exe
        );
 }
@@ -222,7 +268,7 @@ static double find_key_loc(int code)
 			if(keyloc[row][col] == -1) break;
 		}
 		if(keycol) {
-			return -1 + 2.0 * (double) (keycol-1) / (col-1);
+			return ((double) keycol-midloc[row])/(col-midloc[row]);
 		}
 	}
 	return 0;
@@ -307,7 +353,9 @@ int play(int code, int press)
 		TEST_ERROR("source generation");
 
 		double x = find_key_loc(code);
-		alSource3f(src[idx], AL_POSITION, -x, 0, (100 - opt_stereo_width) / 100.0);
+		if (opt_stereo_width > 0) {
+			alSource3f(src[idx], AL_POSITION, -x, 0, (100 - opt_stereo_width) / 100.0);
+		}
 		alSourcef(src[idx], AL_GAIN, opt_gain / 100.0);
 
 		alSourcei(src[idx], AL_BUFFER, buf[idx]);
