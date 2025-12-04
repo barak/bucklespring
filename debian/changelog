@@ -1,4 +1,6 @@
-bucklespring (1.5.1-1) UNRELEASED; urgency=medium
+bucklespring (1.5.1-1) unstable; urgency=medium
+
+  * QA upload.
 
   [ Dominik George ]
    * Move to Salsa.
@@ -19,11 +21,10 @@ bucklespring (1.5.1-1) UNRELEASED; urgency=medium
   * debhelper-compat 13 (routine-update)
   * Update renamed lintian tag names in lintian overrides.
 
- -- Andreas Tille <tille@debian.org>  Thu, 04 Dec 2025 09:58:22 +0100
+ -- Andreas Tille <tille@debian.org>  Thu, 04 Dec 2025 10:08:20 +0100
 
 bucklespring (1.4.0-3) unstable; urgency=medium
 
-  * QA upload.
   * Update Maintainer to QA group
   * Delete obsolete Vcs-* URIs
   * d/control: switch from pkg-config to pkgconf
