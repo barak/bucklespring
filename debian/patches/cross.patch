@@ -3,9 +3,44 @@ Bug-Debian: https://bugs.debian.org/958133
 Description: Fix FTCBFS: hard codes build architecture build tools
 Last-Update: 2020-04-18
 
---- a/Makefile
-+++ b/Makefile
-@@ -60,7 +60,7 @@ dist:
+--- bucklespring-1.5.1.orig/Makefile
++++ bucklespring-1.5.1/Makefile
+@@ -11,6 +11,8 @@
+ CFLAGS  += -DVERSION=\"$(VERSION)\"
+ CFLAGS  += -DPATH_AUDIO=\"$(PATH_AUDIO)\"
+ 
++PKG_CONFIG ?= $(CROSS)pkg-config
++
+ ifdef mingw
+  BIN     := $(NAME).exe
+  CROSS   := i686-w64-mingw32-
+@@ -23,19 +25,19 @@
+  ifeq ($(OS), Darwin)
+   BIN     := $(NAME)
+   PKG_CONFIG_PATH := "./mac/lib/pkgconfig" 
+-  LIBS    += $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs alure openal)
+-  CFLAGS  += $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags alure openal)
++  LIBS    += $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) $(PKG_CONFIG) --libs alure openal)
++  CFLAGS  += $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) $(PKG_CONFIG) --cflags alure openal)
+   LDFLAGS += -framework ApplicationServices -framework OpenAL
+   SRC     += scan-mac.c
+  else
+   BIN     := $(NAME)
+   ifdef libinput
+-   LIBS    += $(shell pkg-config --libs openal alure libinput libudev)
+-   CFLAGS  += $(shell pkg-config --cflags openal alure libinput libudev)
++   LIBS    += $(shell $(PKG_CONFIG) --libs openal alure libinput libudev)
++   CFLAGS  += $(shell $(PKG_CONFIG) --cflags openal alure libinput libudev)
+    SRC     += scan-libinput.c
+   else
+-   LIBS    += $(shell pkg-config --libs openal alure xtst x11)
+-   CFLAGS  += $(shell pkg-config --cflags openal alure xtst x11)
++   LIBS    += $(shell $(PKG_CONFIG) --libs openal alure xtst x11)
++   CFLAGS  += $(shell $(PKG_CONFIG) --cflags openal alure xtst x11)
+    SRC     += scan-x11.c
+   endif
+  endif
+@@ -60,7 +62,7 @@
  	rm -rf $(NAME)-$(VERSION)
  
  rec: rec.c

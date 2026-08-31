@@ -2,8 +2,12 @@ Source: bucklespring
 Section: games
 Priority: optional
 Maintainer: Debian QA Group <packages@qa.debian.org>
-Build-Depends: debhelper-compat (= 13), pkgconf, libopenal-dev, libalure-dev, libxtst-dev
-Standards-Version: 4.7.2
+Build-Depends: debhelper-compat (= 14),
+	pkgconf,
+	libopenal-dev,
+	libalure-dev,
+	libxtst-dev,
+Standards-Version: 4.7.4
 Vcs-Git: https://salsa.debian.org/debian/bucklespring.git
 Vcs-Browser: https://salsa.debian.org/debian/bucklespring
 Homepage: https://github.com/zevv/bucklespring
