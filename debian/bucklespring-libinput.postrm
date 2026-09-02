@@ -1,0 +1,17 @@
+#!/bin/sh
+
+set -e
+
+# The flag file is created by the postinst out of the debconf answer rather
+# than shipped in the package, so dpkg does not know about it and it has to be
+# cleaned up here.  /etc/bucklespring is shipped, but dpkg only gets to remove
+# it while the flag file is still in it, so tidy up the directory too.
+if [ "$1" = remove ] || [ "$1" = purge ]; then
+	rm -f /etc/bucklespring/uaccess
+	rmdir /etc/bucklespring 2> /dev/null || true
+	if [ -d /run/udev ] && command -v udevadm > /dev/null; then
+		udevadm trigger --subsystem-match=input --action=change || true
+	fi
+fi
+
+#DEBHELPER#

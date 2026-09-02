@@ -1,0 +1,26 @@
+#!/bin/sh
+
+set -e
+
+. /usr/share/debconf/confmodule
+
+# Reload the input rules so that the ACLs appear or disappear now rather than
+# at the next hotplug or reboot.  Skipped where udev is not running, such as
+# in a chroot or a container.
+retrigger_input() {
+	if [ -d /run/udev ] && command -v udevadm > /dev/null; then
+		udevadm trigger --subsystem-match=input --action=change || true
+	fi
+}
+
+if [ "$1" = configure ]; then
+	db_get bucklespring-libinput/uaccess
+	if [ "$RET" = true ]; then
+		touch /etc/bucklespring/uaccess
+	else
+		rm -f /etc/bucklespring/uaccess
+	fi
+	retrigger_input
+fi
+
+#DEBHELPER#

@@ -1,0 +1,6 @@
+Name: buckle
+Link: /usr/games/buckle
+Alternative: /usr/games/buckle-libinput
+Dependents:
+ /usr/share/man/man1/buckle.1.gz buckle.1.gz /usr/share/man/man1/buckle-libinput.1.gz
+Priority: 40

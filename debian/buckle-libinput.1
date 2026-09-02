@@ -1,0 +1,68 @@
+.TH BUCKLE\-LIBINPUT "1" "September 2016" "Nostalgia bucklespring keyboard sound" "User Commands"
+.SH NAME
+buckle\-libinput \-  Nostalgia bucklespring keyboard sound, libinput flavour
+.SH SYNOPSIS
+.B buckle\-libinput
+[options]
+.SH DESCRIPTION
+Buckle emulates the sound of an old IBM Model-M space saver
+bucklespring keyboard while typing.
+
+It runs as a background process and plays back the sound of each key
+pressed and released on the keyboard, just as if using an IBM Model-M.
+The sound of each key has carefully been sampled, and is played back
+while simulating the proper distance and direction for a realistic 3D
+sound palette of pure nostalgic bliss.
+.PP
+This flavour reads key events straight from the raw input devices in
+.I /dev/input
+through libinput, rather than from X11, so that it also works under a Wayland
+compositor and on the console.  Those devices are not readable for ordinary
+users out of the box, and running it as root is no answer, as it then no
+longer reaches the sound daemon of the user session; see
+.I /usr/share/doc/bucklespring\-libinput/README.Debian
+for the ways to grant the access, and for what each of them costs you.
+.PP
+The X11 flavour is
+.BR buckle\-x11 (1).
+Both flavours are alternatives for
+.IR /usr/games/buckle ,
+managed by
+.BR update\-alternatives (1).
+.SH OPTIONS
+.HP
+\fB\-d\fR DEVICE
+use OpenAL audio device DEVICE
+.TP
+\fB\-f\fR
+use a fallback sound for unknown keys
+.TP
+\fB\-g\fR GAIN
+set playback gain [0..100]
+.TP
+\fB\-m\fR CODE
+set use CODE as mute key (default 0x46 for scroll lock)
+.TP
+\fB\-h\fR
+show help
+.TP
+\fB\-l\fR
+list available openAL audio devices
+.TP
+\fB\-p\fR PATH
+load .wav files from directory PATH
+.TP
+\fB\-s\fR WIDTH
+set stereo width [0..100]
+.TP
+\fB\-v\fR
+increase verbosity / debugging
+.SH SEE ALSO
+.BR buckle\-libinput.service (8),
+.BR buckle\-x11 (1),
+.BR update\-alternatives (1)
+.SH COPYRIGHT
+Bucklespring was written by Ico Doornekamp and is published under the
+terms of the GNU General Public License version 2.
+
+This manual page was written by Dominik George for the Debian project.

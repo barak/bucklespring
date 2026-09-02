@@ -1,11 +1,18 @@
-Author: Helmut Grohne <helmut@subdivi.de>
-Bug-Debian: https://bugs.debian.org/958133
-Description: Fix FTCBFS: hard codes build architecture build tools
-Last-Update: 2020-04-18
+From: Helmut Grohne <helmut@subdivi.de>
+Date: Wed, 2 Sep 2026 11:50:58 +0100
+Subject: Fix FTCBFS: hard codes build architecture build tools
 
---- bucklespring-1.5.1.orig/Makefile
-+++ bucklespring-1.5.1/Makefile
-@@ -11,6 +11,8 @@
+Bug-Debian: https://bugs.debian.org/958133
+Last-Update: 2026-08-31
+---
+ Makefile | 16 +++++++++-------
+ 1 file changed, 9 insertions(+), 7 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index c3315f9..8b29394 100644
+--- a/Makefile
++++ b/Makefile
+@@ -11,6 +11,8 @@ CFLAGS  += -Wall -Werror
  CFLAGS  += -DVERSION=\"$(VERSION)\"
  CFLAGS  += -DPATH_AUDIO=\"$(PATH_AUDIO)\"
  
@@ -14,7 +21,7 @@ Last-Update: 2020-04-18
  ifdef mingw
   BIN     := $(NAME).exe
   CROSS   := i686-w64-mingw32-
-@@ -23,19 +25,19 @@
+@@ -23,19 +25,19 @@ else
   ifeq ($(OS), Darwin)
    BIN     := $(NAME)
    PKG_CONFIG_PATH := "./mac/lib/pkgconfig" 
@@ -40,7 +47,7 @@ Last-Update: 2020-04-18
     SRC     += scan-x11.c
    endif
   endif
-@@ -60,7 +62,7 @@
+@@ -60,7 +62,7 @@ dist:
  	rm -rf $(NAME)-$(VERSION)
  
  rec: rec.c

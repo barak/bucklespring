@@ -1,42 +1,85 @@
 Source: bucklespring
 Section: games
-Priority: optional
-Maintainer: Debian QA Group <packages@qa.debian.org>
+Maintainer: Barak A. Pearlmutter <bap@debian.org>
 Build-Depends: debhelper-compat (= 14),
 	pkgconf,
 	libopenal-dev,
 	libalure-dev,
 	libxtst-dev,
+	libinput-dev [linux-any],
+	libudev-dev [linux-any],
+	po-debconf,
 Standards-Version: 4.7.4
 Vcs-Git: https://salsa.debian.org/debian/bucklespring.git
 Vcs-Browser: https://salsa.debian.org/debian/bucklespring
 Homepage: https://github.com/zevv/bucklespring
 
-Package: bucklespring
+Package: bucklespring-x11
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, bucklespring-data
-Description: Nostalgia bucklespring keyboard sound
- Buckle emulates the sound of an old IBM Model-M space saver
+Depends: ${shlibs:Depends}, bucklespring-data (>= ${source:Version})
+Provides: bucklespring
+Conflicts: bucklespring (<< 1.5.1-2~)
+Replaces: bucklespring (<< 1.5.1-2~)
+Description: Nostalgia bucklespring keyboard sound - X11 flavour
+ Bucklespring emulates the sound of an old IBM Model-M space saver
  bucklespring keyboard while typing within an X session.
  .
  It runs as a background process and plays back the sound of each key
- pressed and released on the keyboard, just as if using an IBM Model-M.
- The sound of each key has carefully been sampled, and is played back
- while simulating the proper distance and direction for a realistic 3D
- sound palette of pure nostalgic bliss.
+ pressed and released on the keyboard, just as if using an IBM
+ Model-M. The sound of each key has carefully been sampled, and is
+ played back while simulating the proper distance and direction for a
+ realistic 3D sound palette of pure nostalgic bliss.
+ .
+ This flavour grabs the key events through X11, and thus only sounds
+ for keys typed within an X session. It is registered as an
+ alternative for /usr/games/buckle; see bucklespring-libinput for
+ the Wayland and console flavour.
+
+Package: bucklespring-libinput
+Architecture: linux-any
+Depends: ${shlibs:Depends}, ${misc:Depends}, bucklespring-data (>= ${source:Version})
+Provides: bucklespring
+Conflicts: bucklespring (<< 1.5.1-2~)
+Replaces: bucklespring (<< 1.5.1-2~)
+Description: Nostalgia bucklespring keyboard sound - libinput flavour
+ Bucklespring emulates the sound of an old IBM Model-M space saver
+ bucklespring keyboard while typing.
+ .
+ It runs as a background process and plays back the sound of each key
+ pressed and released on the keyboard, just as if using an IBM
+ Model-M. The sound of each key has carefully been sampled, and is
+ played back while simulating the proper distance and direction for a
+ realistic 3D sound palette of pure nostalgic bliss.
+ .
+ This flavour reads the key events straight from the raw input devices
+ in /dev/input through libinput instead of from X11, so it also works
+ under a Wayland compositor and on the console. Those devices are not
+ readable for ordinary users out of the box; a debconf question, asked at
+ medium priority and answered no by default, offers to grant the access to
+ the user at the local seat, see README.Debian. It is registered as an
+ alternative for /usr/games/buckle.
+
+Package: bucklespring
+Architecture: all
+Section: oldlibs
+Depends: bucklespring-x11 | bucklespring-libinput
+Description: Nostalgia bucklespring keyboard sound - transitional package
+ This is a transitional package, pulling in bucklespring-x11 or
+ bucklespring-libinput now that the program is shipped in one binary
+ package per key event source. It can safely be removed.
 
 Package: bucklespring-data
 Architecture: all
-Depends: ${misc:Depends}
 Multi-Arch: foreign
+Breaks: bucklespring (<< 1.5.1-2~)
 Description: Nostalgia bucklespring keyboard sound - sound files
- Buckle emulates the sound of an old IBM Model-M space saver
- bucklespring keyboard while typing within an X session.
+ Bucklespring emulates the sound of an old IBM Model-M space saver
+ bucklespring keyboard while typing.
  .
  It runs as a background process and plays back the sound of each key
- pressed and released on the keyboard, just as if using an IBM Model-M.
- The sound of each key has carefully been sampled, and is played back
- while simulating the proper distance and direction for a realistic 3D
- sound palette of pure nostalgic bliss.
+ pressed and released on the keyboard, just as if using an IBM
+ Model-M. The sound of each key has carefully been sampled, and is
+ played back while simulating the proper distance and direction for a
+ realistic 3D sound palette of pure nostalgic bliss.
  .
  This package contains the keyboard sound files.

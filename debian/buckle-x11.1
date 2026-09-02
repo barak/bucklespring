@@ -1,8 +1,9 @@
-.TH BUCKLE "1" "September 2016" "Nostalgia bucklespring keyboard sound" "User Commands"
+.TH BUCKLE\-X11 "1" "September 2016" "Nostalgia bucklespring keyboard sound" "User Commands"
 .SH NAME
-buckle -  Nostalgia bucklespring keyboard sound
+buckle\-x11 \-  Nostalgia bucklespring keyboard sound, X11 flavour
 .SH SYNOPSIS
-buckle [options]
+.B buckle\-x11
+[options]
 .SH DESCRIPTION
 Buckle emulates the sound of an old IBM Model-M space saver
 bucklespring keyboard while typing within an X session.
@@ -12,6 +13,14 @@ pressed and released on the keyboard, just as if using an IBM Model-M.
 The sound of each key has carefully been sampled, and is played back
 while simulating the proper distance and direction for a realistic 3D
 sound palette of pure nostalgic bliss.
+.PP
+This flavour grabs key events through X11, and therefore only reports keys
+typed within an X session.  For Wayland compositors and for the console, see
+.BR buckle\-libinput (1).
+Both flavours are alternatives for
+.IR /usr/games/buckle ,
+managed by
+.BR update\-alternatives (1).
 .SH OPTIONS
 .HP
 \fB\-d\fR DEVICE
@@ -40,6 +49,10 @@ set stereo width [0..100]
 .TP
 \fB\-v\fR
 increase verbosity / debugging
+.SH SEE ALSO
+.BR buckle\-x11.service (8),
+.BR buckle\-libinput (1),
+.BR update\-alternatives (1)
 .SH COPYRIGHT
 Bucklespring was written by Ico Doornekamp and is published under the
 terms of the GNU General Public License version 2.

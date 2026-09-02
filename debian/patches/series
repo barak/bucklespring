@@ -1,1 +1,4 @@
 cross.patch
+libinput-mouse-click.patch
+0003-add-Library.patch
+0004-fix-stereo-width-option-not-working.patch

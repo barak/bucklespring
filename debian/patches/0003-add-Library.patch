@@ -1,0 +1,20 @@
+From: Matin6725 <Matin6725@gmail.com>
+Date: Fri, 21 Mar 2025 01:28:05 +0330
+Subject: add Library
+
+---
+ main.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/main.c b/main.c
+index e315143..2dbfa63 100644
+--- a/main.c
++++ b/main.c
+@@ -16,6 +16,7 @@
+ #include <OpenAL/alure.h>
+ #else
+ #include <AL/al.h>
++#include <AL/alc.h>
+ #include <AL/alure.h>
+ #endif
+ 

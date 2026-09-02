@@ -1,0 +1,120 @@
+bucklespring-libinput and access to the keyboard devices
+========================================================
+
+The executable in this package, buckle-libinput, reads key events straight
+from the raw input devices in /dev/input through libinput, rather than from
+X11, so that it also works under a Wayland compositor and on the console.
+It is registered as an alternative for /usr/games/buckle, so with both
+flavours installed pick it with
+
+  # update-alternatives --config buckle
+
+The input devices are root:input 0660, so out of the box buckle-libinput can
+only read them as root. Running it as root is no good either, as then cannot
+find the PulseAudio/PipeWire socket of your session so cannot play audio.
+Input device access has to be granted to the normal user.
+
+Any way of doing that has security implications: processes able to read
+/dev/input/event* can log every keystroke on the machine, including passwords
+typed into other applications. Bucklespring is just for fun, so you should
+only do this if you accept the security risk for pure whimsy.
+
+Recommended: the uaccess udev rule
+----------------------------------
+
+The package installs
+
+  /usr/lib/udev/rules.d/70-bucklespring-libinput.rules
+
+which tags the keyboard and pointer event devices with "uaccess", making
+systemd-logind put an ACL on them for the user who is physically logged in at
+the local seat. Access is limited to that active local session and is revoked
+at logout, so remote or background users of the machine do not get it.
+
+The rule does nothing until you enable it, and enabling it is a flag file
+rather than a copy of the rule. Installing the package asks whether to turn it
+on, at medium debconf priority and defaulting to no; to change that answer
+later:
+
+  # dpkg-reconfigure bucklespring-libinput
+
+which creates or deletes /etc/bucklespring/uaccess and re-triggers the input
+devices for you. That answer is authoritative: the file is rewritten from it
+whenever the package is configured, so do it by hand only as a temporary
+change, and remember the trigger:
+
+  # touch /etc/bucklespring/uaccess
+  # udevadm trigger --subsystem-match=input --action=change
+
+Check that it took with "getfacl /dev/input/event3" (any keyboard device),
+which should now list your user with "rw-". Taking the access away again is
+the same in reverse:
+
+  # rm /etc/bucklespring/uaccess
+  # udevadm trigger --subsystem-match=input --action=change
+
+The pointer devices are tagged for the sake of the click sound on mouse
+buttons. To get key sounds without handing out the mouse and touchpad, copy
+the rule into /etc/udev/rules.d/ under the same name, delete the
+ID_INPUT_MOUSE and ID_INPUT_TOUCHPAD lines in the copy, and reload:
+
+  # cp /usr/lib/udev/rules.d/70-bucklespring-libinput.rules /etc/udev/rules.d/
+  # editor /etc/udev/rules.d/70-bucklespring-libinput.rules
+  # udevadm control --reload
+  # udevadm trigger --subsystem-match=input --action=change
+
+A file of that name in /etc/udev/rules.d takes precedence over the one in
+/usr/lib and, unlike the shipped one, is not overwritten on upgrade. A symlink
+there pointing at /dev/null disables the rule outright.
+
+The 70 in the file name matters: it sorts the rule after
+60-persistent-input.rules, which is what sets ID_INPUT_KEYBOARD, and before
+73-seat-late.rules, which acts on the uaccess tag.
+
+Starting it automatically
+-------------------------
+
+The package ships a systemd user unit, buckle-libinput.service, not enabled on
+install:
+
+  $ systemctl --user enable --now buckle-libinput
+
+It follows the desktop session on the local seat, and does nothing until the
+access above has been granted. See buckle-libinput.service(8) for the details,
+including what to do about a login on a plain text console.
+
+Alternative: the input group
+----------------------------
+
+  # adduser <user> input
+
+This is coarser: it applies to all of that user's processes at all times,
+local session or not, so the uaccess rule above is preferable. It is however
+the only option on a system without systemd-logind or elogind.
+
+Why the binary is not setgid or capability marked
+-------------------------------------------------
+
+Marking the binary itself ("chgrp input /usr/games/buckle-libinput" plus
+setgid, or setcap cap_dac_override) would confine the extra privilege to this
+one program rather than to everything the user runs, which sounds like the
+better idea, but it has a few issues:
+
+ - It gives *every* local account, including system and ssh-only ones that
+   never sit at this machine, a ready made way to read all keyboard input.
+ - buckle links OpenAL and alure, which read configuration files and load
+   backend plugins at runtime; that is a large and unaudited surface to run
+   under a privilege the caller does not otherwise have.
+ - cap_dac_override in particular is not "may read input devices", it is "may
+   bypass all file permission checks", i.e., close to root.
+
+It does not drop the privilege after opening the devices, and hardening the
+bucklespring executable enough to be a trustworthy setgid program would entail
+considerable effort. Granting the access to the seat-local user through udev
+has a smaller vulnerability surface.
+
+Note that buckle-libinput prints "Failed to open /dev/input/eventN (Permission
+denied)" on startup for the input devices the rule above does not cover, and
+libinput just skips those. The message is harmless.
+
+ -- Barak A. Pearlmutter <bap@debian.org>, Tue,  1 Sep 2026 09:04:54 +0100

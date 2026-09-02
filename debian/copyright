@@ -3,11 +3,14 @@ Upstream-Name: bucklespring
 Source: https://github.com/zevv/bucklespring
 
 Files: *
-Copyright: 2016 Ico Doornekampt
+Copyright: 2016-2025 Ico Doornekampt <ico@zevv.nl>
 License: GPL-2+
 
 Files: debian/*
-Copyright: 2016 Dominik George <nik@naturalnet.de>
+Copyright: 2016-2017 Dominik George <nik@naturalnet.de>
+           2025 Chris Hofstaedtler <zeha@debian.org>,
+                Andreas Tille <tille@debian.org>
+           2026 Barak A. Pearlmutter <bap@debian.org>
 License: GPL-2+
 
 License: GPL-2+

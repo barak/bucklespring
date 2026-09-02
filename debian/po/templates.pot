@@ -1,0 +1,57 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the bucklespring package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: bucklespring\n"
+"Report-Msgid-Bugs-To: bucklespring@packages.debian.org\n"
+"POT-Creation-Date: 2026-09-02 09:18+0100\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=CHARSET\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#. Type: boolean
+#. Description
+#: ../bucklespring-libinput.templates:1001
+msgid "Let the user at the local seat read the input devices?"
+msgstr ""
+
+#. Type: boolean
+#. Description
+#: ../bucklespring-libinput.templates:1001
+msgid ""
+"buckle-libinput reads key and mouse events straight from /dev/input, which "
+"ordinarily only root and members of the \"input\" group may do. This package "
+"ships a udev rule that hands the keyboard and pointer devices to whoever is "
+"physically logged in at the local seat, as an ACL which systemd-logind adds "
+"at login and takes away again at logout. The rule stays inert unless it is "
+"enabled here."
+msgstr ""
+
+#. Type: boolean
+#. Description
+#: ../bucklespring-libinput.templates:1001
+msgid ""
+"Enabling it has a real cost: every process that user runs can then read "
+"every keystroke on the machine, including passwords typed into other "
+"applications. Bucklespring is a toy that makes a keyboard sound like an IBM "
+"Model M, so only agree if you are content to pay that price for the noise."
+msgstr ""
+
+#. Type: boolean
+#. Description
+#: ../bucklespring-libinput.templates:1001
+msgid ""
+"The answer is stored as the presence or absence of the file /etc/"
+"bucklespring/uaccess, which is rewritten from this answer every time the "
+"package is configured. Create or delete that file by hand for a temporary "
+"change, and run \"udevadm trigger --subsystem-match=input --action=change\" "
+"afterwards so that it reaches devices which are already plugged in."
+msgstr ""

@@ -1,0 +1,4 @@
+# Deliberate: bucklespring (<< 1.5.1-2~) shipped /usr/games/buckle, which this
+# package supersedes, and the old package is meant to go away rather than to
+# stay unpacked next to this one.  Paired with an equally versioned Replaces.
+bucklespring-x11: conflicts-with-version bucklespring (<< 1.5.1-2~)

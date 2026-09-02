@@ -1,10 +1,37 @@
-bucklespring (1.5.1-2) UNRELEASED; urgency=medium
+bucklespring (1.5.1-2) unstable; urgency=medium
 
+  * Adopt package (closes: #1077193)
+  * Track upstream post-release changes
+  * Build one binary package per key event source: bucklespring-x11 as
+    before, and bucklespring-libinput reading /dev/input via libinput, for
+    use on Wayland and on the console (linux-any).  Both Provide bucklespring
+    and register their executable, buckle-x11 and buckle-libinput
+    respectively, as an update-alternatives alternative for
+    /usr/games/buckle.
+  * Make bucklespring a transitional package which depends upon
+    bucklespring-x11 | bucklespring-libinput.
+  * bucklespring-libinput: ship a uaccess udev rule giving the seat-local
+    user access to the keyboard and pointer devices, inert unless the
+    administrator creates the flag file /etc/bucklespring/uaccess, and a
+    README.Debian explaining it and why the binary is not shipped setgid
+    input or capability marked.  The flag file is driven by a debconf
+    question asked at medium priority and answered no by default, and is
+    removed again when the package is.
+  * Ship a systemd user unit per flavour, buckle-x11.service and
+    buckle-libinput.service, not enabled on install.  Each is wanted by
+    graphical-session.target rather than default.target, so that it starts
+    and stops with a session on the local seat even for a user who has
+    lingering enabled.
+  * New patch libinput-mouse-click.patch: play the click sound on mouse
+    buttons in the libinput backend too, as the X11 backend already does.
+  * Update cross patch to deal with pkg-config (closes: #1125146).
   * Bump to debhelper 14.
-  * Update patch, cross compilation pkg-config (closes: #1125146)
   * Upstream metadata
+  * Remove redundant Priority: optional from source stanza.
+  * Remove undefined dependency substitution variables.
+  * Update debian/copyright etc.
 
- -- Barak A. Pearlmutter <bap@debian.org>  Mon, 31 Aug 2026 15:16:28 +0100
+ -- Barak A. Pearlmutter <bap@debian.org>  Wed, 02 Sep 2026 08:42:22 +0100
 
 bucklespring (1.5.1-1) unstable; urgency=medium
 

@@ -1,0 +1,10 @@
+# Deliberate: bucklespring (<< 1.5.1-2~) shipped /usr/games/buckle, which this
+# package supersedes, and the old package is meant to go away rather than to
+# stay unpacked next to this one.  Paired with an equally versioned Replaces.
+bucklespring-libinput: conflicts-with-version bucklespring (<< 1.5.1-2~)
+
+# The udev rule matches whole device classes, any keyboard and any pointer,
+# rather than particular hardware, so there is no modalias to advertise:
+# bucklespring is a toy that makes key presses sound like a Model M, not a
+# driver whose availability a software centre should offer for a given device.
+bucklespring-libinput: appstream-metadata-missing-modalias-provide usr/lib/udev/rules.d/70-bucklespring-libinput.rules

@@ -1,0 +1,21 @@
+From: Danilo Rezende <50598421+returnDanilo@users.noreply.github.com>
+Date: Sat, 3 Feb 2024 08:17:31 -0300
+Subject: fix --stereo-width option not working
+
+---
+ main.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/main.c b/main.c
+index 2dbfa63..08ab29b 100644
+--- a/main.c
++++ b/main.c
+@@ -88,7 +88,7 @@ static const struct option long_opts[] = {
+ 	{ "mute-keycode",   required_argument, NULL, 'm' },
+ 	{ "mute",           no_argument,       NULL, 'M' },
+ 	{ "audio-path",     required_argument, NULL, 'p' },
+-	{ "stereo-width",   required_argument, NULL, 'w' },
++	{ "stereo-width",   required_argument, NULL, 's' },
+ 	{ "verbose",        no_argument,       NULL, 'v' },
+         { 0, 0, 0, 0 }
+ };

@@ -1,0 +1,21 @@
+Template: bucklespring-libinput/uaccess
+Type: boolean
+Default: false
+_Description: Let the user at the local seat read the input devices?
+ buckle-libinput reads key and mouse events straight from /dev/input, which
+ ordinarily only root and members of the "input" group may do. This package
+ ships a udev rule that hands the keyboard and pointer devices to whoever is
+ physically logged in at the local seat, as an ACL which systemd-logind adds
+ at login and takes away again at logout. The rule stays inert unless it is
+ enabled here.
+ .
+ Enabling it has a real cost: every process that user runs can then read every
+ keystroke on the machine, including passwords typed into other applications.
+ Bucklespring is a toy that makes a keyboard sound like an IBM Model M, so
+ only agree if you are content to pay that price for the noise.
+ .
+ The answer is stored as the presence or absence of the file
+ /etc/bucklespring/uaccess, which is rewritten from this answer every time the
+ package is configured. Create or delete that file by hand for a temporary
+ change, and run "udevadm trigger --subsystem-match=input --action=change"
+ afterwards so that it reaches devices which are already plugged in.

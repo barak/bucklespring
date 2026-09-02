@@ -1,7 +1,34 @@
 #!/usr/bin/make -f
 
 export DEB_BUILD_MAINT_OPTIONS=hardening=+all
-export PATH_AUDIO=/usr/share/buckle/wav
+export PATH_AUDIO=/usr/share/bucklespring/wav
+
+include /usr/share/dpkg/architecture.mk
 
 %:
 	dh $@
+
+# One binary per key event source: buckle-x11 grabs the events through X11,
+# buckle-libinput reads the raw input devices, for Wayland and the console.
+execute_after_dh_auto_build:
+	mv buckle buckle-x11
+ifeq ($(DEB_HOST_ARCH_OS),linux)
+	$(MAKE) clean
+	dh_auto_build -- libinput=1
+	mv buckle buckle-libinput
+endif
+
+execute_after_dh_auto_clean:
+	$(RM) buckle-x11 buckle-libinput scan-libinput.o
+
+# 70 sorts after 60-persistent-input.rules, which sets ID_INPUT_KEYBOARD, and
+# before 73-seat-late.rules, which acts on the uaccess tag the rule sets.
+override_dh_installudev:
+	dh_installudev --priority=70
+
+# Both flavours may be installed at once, so each ships its own unit rather
+# than one buckle.service that would collide.  Neither is enabled on install:
+# a program that makes a noise on every keystroke is opt in.
+override_dh_installsystemduser:
+	dh_installsystemduser --no-enable --name=buckle-x11
+	dh_installsystemduser --no-enable --name=buckle-libinput
