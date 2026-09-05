@@ -3,8 +3,20 @@ Upstream-Name: bucklespring
 Source: https://github.com/zevv/bucklespring
 
 Files: *
-Copyright: 2016-2025 Ico Doornekampt <ico@zevv.nl>
+Copyright: 2016-2025 Ico Doornekamp <ico@zevv.nl>
 License: GPL-2+
+
+Files: scan-mac.c
+Copyright: 2016-2025 Ico Doornekamp <ico@zevv.nl>
+License: GPL-2+
+Comment: The table mapping Mac virtual keycodes to set-1 scancodes is taken
+ from VirtualBox,
+ https://www.virtualbox.org/svn/vbox/trunk/src/VBox/Frontends/VirtualBox/src/platform/darwin/DarwinKeyboard.cpp
+ and the event tap callback is adapted from
+ https://danielbeard.wordpress.com/2010/10/29/listening-for-global-keypresses-in-osx/
+ .
+ This file is only compiled on macOS; it is not built by, or shipped in,
+ any of the Debian binary packages.
 
 Files: debian/*
 Copyright: 2016-2017 Dominik George <nik@naturalnet.de>
