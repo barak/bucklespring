@@ -71,6 +71,114 @@ The 70 in the file name matters: it sorts the rule after
 60-persistent-input.rules, which is what sets ID_INPUT_KEYBOARD, and before
 73-seat-late.rules, which acts on the uaccess tag.
 
+Narrowing the grant to a group of users
+--------------------------------------
+
+The uaccess mechanism is per seat rather than per user: it grants to whoever
+holds the active session at the local seat, and /etc/bucklespring/uaccess is
+a switch for the whole machine. On a desktop with several accounts you may
+want only some of them to have it.
+
+That is an intersection of two facts, "is in a group" and "is logged in at
+the local seat", and the only place a privileged process gets told both is
+the PAM session stack at login. The package does not set this up, because
+installing it means editing the system authentication configuration, which is
+more than a program that makes typing noises ought to do to your machine.
+Doing it by hand is not hard.
+
+Leave the debconf question answered no, so the shipped udev rule stays inert
+and logind grants nothing to anybody, and prepare the group:
+
+  # apt-get install acl
+  # addgroup --system bucklespring
+  # adduser <user> bucklespring
+
+Save this as /usr/local/sbin/bucklespring-acl, owned by root and mode 0755:
+
+  #!/bin/sh
+  # Give members of group bucklespring access to the input devices for the
+  # length of a login at the local seat.  Run as root by pam_exec(8).
+
+  set -e
+
+  : "${PAM_USER:?}"
+
+  # Remote logins never get the access, and, just as important, logging out
+  # of one must not take it away from the seat.
+  [ -z "${PAM_RHOST:-}" ] || exit 0
+
+  groups=$(id -nG "$PAM_USER" 2> /dev/null || true)
+  case " $groups " in
+  *" bucklespring "*) ;;
+  *) exit 0 ;;
+  esac
+
+  # The same devices the shipped udev rule would tag.  Drop MOUSE and
+  # TOUCHPAD here for key sounds without handing out the pointer devices.
+  for_each_device() {
+  	for dev in /dev/input/event*; do
+  		[ -c "$dev" ] || continue
+  		udevadm info --query=property --name="$dev" 2> /dev/null |
+  			grep -qE '^ID_INPUT_(KEYBOARD|MOUSE|TOUCHPAD)=1$' ||
+  			continue
+  		"$@" "$dev" || true
+  	done
+  }
+
+  # rw, not r, as libinput opens the event nodes O_RDWR; this is the same
+  # access uaccess itself hands out.
+  grant() { setfacl -m "u:$PAM_USER:rw" "$1"; }
+  revoke() { setfacl -x "u:$PAM_USER" "$1"; }
+
+  case "${PAM_TYPE:-}" in
+  open_session)
+  	# Only once logind has actually put a session of this user on a seat.
+  	for s in $(loginctl show-user "$PAM_USER" \
+  			--property=Sessions --value 2> /dev/null); do
+  		seat=$(loginctl show-session "$s" \
+  			--property=Seat --value 2> /dev/null || true)
+  		if [ -n "$seat" ]; then
+  			for_each_device grant
+  			break
+  		fi
+  	done
+  	;;
+  close_session)
+  	for_each_device revoke
+  	;;
+  esac
+
+  exit 0
+
+Then add it to the end of /etc/pam.d/common-session, below the line reading
+"# end of pam-auth-update config":
+
+  session optional pam_exec.so /usr/local/sbin/bucklespring-acl
+
+Local modules belong outside that block, which pam-auth-update rewrites, and
+being below it also puts the line after pam_systemd.so, so that the logind
+session exists by the time the script goes looking for it.
+
+Finally, the shipped user unit refuses to start while the flag file
+/etc/bucklespring/uaccess is missing, which it now always is, so drop that
+condition with
+
+  $ systemctl --user edit buckle-libinput
+
+and a drop-in of
+
+  [Unit]
+  ConditionPathExists=
+
+Check the result with "getfacl /dev/input/event3" after a fresh login: a
+member of the group should be listed with "rw-" and anybody else not at all.
+
+Two things to know about it. Devices plugged in during a session do not get
+the ACL, as nothing runs between login and logout; log out and back in.  And
+two simultaneous local logins by the same user, a desktop session and a text
+console say, share the one ACL, so leaving either takes the access away from
+both until the next login.
+
 Starting it automatically
 -------------------------
 

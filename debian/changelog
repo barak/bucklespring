@@ -4,6 +4,10 @@ bucklespring (1.5.1-3) UNRELEASED; urgency=medium
     VirtualBox's DarwinKeyboard.cpp and a blog post by Daniel Beard, as
     suggested in the NEW queue review, even though that file is not
     built on Debian.
+  * bucklespring-libinput README.Debian: add a recipe for narrowing the
+    input device grant to members of a group, by way of a pam_exec(8)
+    hook that applies the ACL at login on the local seat, as udev's
+    uaccess tag is per seat and cannot select users.
 
  -- Barak A. Pearlmutter <bap@debian.org>  Sat, 05 Sep 2026 11:07:18 +0100
 
