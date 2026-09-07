@@ -63,11 +63,17 @@ void key_pressed_cb(XPointer arg, XRecordInterceptData *d)
     
 	int key = ((unsigned char*) d->data)[1];
 	int type = ((unsigned char*) d->data)[0] & 0x7F;
+
+	/* The X server marks the KeyPress events it generates while a key is
+	 * held down, and sends no KeyRelease in between, so a repeat is one
+	 * extra click.  Modifiers do not repeat, XKB does not mark them as
+	 * repeating keys, so holding shift stays quiet by itself. */
+
 	int repeat = d->data[2] & 1;
 
 	key -= 8; /* X code to scan code? */
 
-	if(!repeat) {
+	if(!repeat || repeat_enabled()) {
 
 		switch (type) {
 			case KeyPress:

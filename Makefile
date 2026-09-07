@@ -34,9 +34,9 @@ else
  else
   BIN     := $(NAME)
   ifdef libinput
-   LIBS    += $(shell $(PKG_CONFIG) --libs openal alure libinput libudev)
-   CFLAGS  += $(shell $(PKG_CONFIG) --cflags openal alure libinput libudev)
-   SRC     += scan-libinput.c
+   LIBS    += $(shell $(PKG_CONFIG) --libs openal alure libinput libudev wayland-client)
+   CFLAGS  += $(shell $(PKG_CONFIG) --cflags openal alure libinput libudev wayland-client)
+   SRC     += scan-libinput.c wl-repeat.c
   else
    LIBS    += $(shell $(PKG_CONFIG) --libs openal alure xtst x11)
    CFLAGS  += $(shell $(PKG_CONFIG) --cflags openal alure xtst x11)

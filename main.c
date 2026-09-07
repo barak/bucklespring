@@ -73,12 +73,21 @@ static int opt_stereo_width = 50;
 static int opt_gain = 100;
 static int opt_fallback_sound = 0;
 static int opt_mute_keycode = DEFAULT_MUTE_KEYCODE;
+static int opt_no_repeat = 0;
+static int opt_repeat_delay = 0;
+static int opt_repeat_rate = 0;
 static const char *opt_device = NULL;
 static const char *opt_path_audio = PATH_AUDIO;
 static int muted = 0;
 
 
-static const char short_opts[] = "d:fg:hlm:Mp:s:cv";
+/* Options with no short form of their own start past the character codes. */
+enum {
+	OPT_REPEAT_DELAY = 256,
+	OPT_REPEAT_RATE,
+};
+
+static const char short_opts[] = "d:fg:hlm:Mp:rs:cv";
 
 static const struct option long_opts[] = {
 	{ "device",         required_argument, NULL, 'd' },
@@ -89,6 +98,9 @@ static const struct option long_opts[] = {
 	{ "mute-keycode",   required_argument, NULL, 'm' },
 	{ "mute",           no_argument,       NULL, 'M' },
 	{ "audio-path",     required_argument, NULL, 'p' },
+	{ "no-repeat",      no_argument,       NULL, 'r' },
+	{ "repeat-delay",   required_argument, NULL, OPT_REPEAT_DELAY },
+	{ "repeat-rate",    required_argument, NULL, OPT_REPEAT_RATE },
 	{ "stereo-width",   required_argument, NULL, 's' },
 	{ "no-click",       no_argument,       NULL, 'c' },
 	{ "verbose",        no_argument,       NULL, 'v' },
@@ -129,6 +141,15 @@ int main(int argc, char **argv)
 				break;
 			case 'p':
 				opt_path_audio = optarg;
+				break;
+			case 'r':
+				opt_no_repeat = 1;
+				break;
+			case OPT_REPEAT_DELAY:
+				opt_repeat_delay = atoi(optarg);
+				break;
+			case OPT_REPEAT_RATE:
+				opt_repeat_rate = atoi(optarg);
 				break;
 			case 's':
 				opt_stereo_width = atoi(optarg);
@@ -220,6 +241,10 @@ static void usage(char *exe)
 		"  -h, --help                show help\n"
 		"  -l, --list-devices        list available OpenAL audio devices\n"
 		"  -p, --audio-path=PATH     load .wav files from directory PATH\n"
+		"  -r, --no-repeat           stay silent while a held key auto repeats\n"
+		"      --repeat-delay=MS     wait MS before the first repeat, overriding\n"
+		"                            what the compositor or the kernel says\n"
+		"      --repeat-rate=HZ      make HZ repeats per second, likewise\n"
 		"  -s, --stereo-width=WIDTH  set stereo width [0..100]\n"
 		"  -v, --verbose             increase verbosity / debugging\n",
 		exe
@@ -240,6 +265,34 @@ static void list_devices(void)
 		next += (len + 2);
 	}
 	printf("\n");
+}
+
+
+/*
+ * Should a key that the user holds down make a sound each time it auto
+ * repeats?  The backends ask, as each has to recognise a repeat its own way.
+ */
+
+int repeat_enabled(void)
+{
+	return !opt_no_repeat;
+}
+
+
+/*
+ * The backend works out how fast the keyboard repeats and then offers the
+ * answer here, so that anyone who disagrees with it can say so on the command
+ * line.  Values left at zero are the ones the user did not care about.
+ */
+
+void repeat_override(int *delay_ms, int *period_ms)
+{
+	if(opt_repeat_delay > 0) {
+		*delay_ms = opt_repeat_delay;
+	}
+	if(opt_repeat_rate > 0) {
+		*period_ms = 1000 / opt_repeat_rate;
+	}
 }
 
 
