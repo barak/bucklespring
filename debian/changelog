@@ -8,8 +8,15 @@ bucklespring (1.5.1-3) UNRELEASED; urgency=medium
     input device grant to members of a group, by way of a pam_exec(8)
     hook that applies the ACL at login on the local seat, as udev's
     uaccess tag is per seat and cannot select users.
+  * New patch no-repeat.patch: play the click sound each time a key held
+    down auto repeats, rather than falling silent until it is released,
+    with a new option -r/--no-repeat to get the old behaviour back.  The
+    X11 backend only had to stop discarding the repeat events it already
+    recognised; libinput drops the kernel's repeats altogether, so that
+    backend times its own, leaving out the modifier keys that no display
+    server repeats.
 
- -- Barak A. Pearlmutter <bap@debian.org>  Sat, 05 Sep 2026 11:07:18 +0100
+ -- Barak A. Pearlmutter <bap@debian.org>  Mon, 07 Sep 2026 12:33:07 +0100
 
 bucklespring (1.5.1-2) unstable; urgency=medium
 

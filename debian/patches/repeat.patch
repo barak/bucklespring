@@ -1,0 +1,262 @@
+From: "Barak A. Pearlmutter" <bap@debian.org>
+Date: Mon, 7 Sep 2026 11:40:00 +0100
+Subject: play a sound each time a held key auto repeats
+
+Holding a key down made one click and then silence, however many characters
+it went on to produce.  Click for every repeat instead, and add --no-repeat
+for those who preferred it the other way.
+
+The two backends learn of a repeat differently.  The X server marks the
+KeyPress events it generates while a key is held, which the backend already
+recognised and then deliberately threw away, and sends no KeyRelease in
+between, so there it is a matter of no longer discarding them.  libinput
+drops the kernel's repeat events outright, "ignore kernel key repeat" in
+evdev-fallback.c, and leaves repeating to its caller, so that backend times
+its own from the kernel defaults, 250 ms to the first repeat and 33 ms
+between the rest.
+
+The kernel repeats modifiers too, unlike XKB, so the libinput backend leaves
+them out; hearing shift chatter while it is held would be odd, and it also
+keeps a held key from drumming out the mute sequence of three taps on scroll
+lock.
+Forwarded: no
+---
+ buckle.h        |   1 +
+ main.c          |  19 ++++++++++-
+ scan-libinput.c | 104 ++++++++++++++++++++++++++++++++++++++++++++++++++++++--
+ scan-x11.c      |   8 ++++-
+ 4 files changed, 128 insertions(+), 4 deletions(-)
+
+diff --git a/buckle.h b/buckle.h
+index 4d22cd8..7954f8a 100644
+--- a/buckle.h
++++ b/buckle.h
+@@ -2,6 +2,7 @@
+ #define buckle_h
+ 
+ int play(int code, int press);
++int repeat_enabled(void);
+ int scan(int verbose);
+ void printd(const char *fmt, ...);
+ void open_console(void);
+diff --git a/main.c b/main.c
+index 08ab29b..c4642bc 100644
+--- a/main.c
++++ b/main.c
+@@ -72,12 +72,13 @@ static int opt_stereo_width = 50;
+ static int opt_gain = 100;
+ static int opt_fallback_sound = 0;
+ static int opt_mute_keycode = DEFAULT_MUTE_KEYCODE;
++static int opt_no_repeat = 0;
+ static const char *opt_device = NULL;
+ static const char *opt_path_audio = PATH_AUDIO;
+ static int muted = 0;
+ 
+ 
+-static const char short_opts[] = "d:fg:hlm:Mp:s:v";
++static const char short_opts[] = "d:fg:hlm:Mp:rs:v";
+ 
+ static const struct option long_opts[] = {
+ 	{ "device",         required_argument, NULL, 'd' },
+@@ -88,6 +89,7 @@ static const struct option long_opts[] = {
+ 	{ "mute-keycode",   required_argument, NULL, 'm' },
+ 	{ "mute",           no_argument,       NULL, 'M' },
+ 	{ "audio-path",     required_argument, NULL, 'p' },
++	{ "no-repeat",      no_argument,       NULL, 'r' },
+ 	{ "stereo-width",   required_argument, NULL, 's' },
+ 	{ "verbose",        no_argument,       NULL, 'v' },
+         { 0, 0, 0, 0 }
+@@ -128,6 +130,9 @@ int main(int argc, char **argv)
+ 			case 'p':
+ 				opt_path_audio = optarg;
+ 				break;
++			case 'r':
++				opt_no_repeat = 1;
++				break;
+ 			case 's':
+ 				opt_stereo_width = atoi(optarg);
+ 				break;
+@@ -214,6 +219,7 @@ static void usage(char *exe)
+ 		"  -h, --help                show help\n"
+ 		"  -l, --list-devices        list available openAL audio devices\n"
+ 		"  -p, --audi-path=PATH      load .wav files from directory PATH\n"
++		"  -r, --no-repeat           stay silent while a held key auto repeats\n"
+ 		"  -s, --stereo-width=WIDTH  set stereo width [0..100]\n"
+ 		"  -v, --verbose             increase verbosity / debugging\n",
+ 		exe
+@@ -237,6 +243,17 @@ static void list_devices(void)
+ }
+ 
+ 
++/*
++ * Should a key that the user holds down make a sound each time it auto
++ * repeats?  The backends ask, as each has to recognise a repeat its own way.
++ */
++
++int repeat_enabled(void)
++{
++	return !opt_no_repeat;
++}
++
++
+ void printd(const char *fmt, ...)
+ {
+ 	if(opt_verbose) {
+diff --git a/scan-libinput.c b/scan-libinput.c
+index 30ade31..f401b41 100644
+--- a/scan-libinput.c
++++ b/scan-libinput.c
+@@ -4,6 +4,7 @@
+ #include <sys/poll.h>
+ #include <string.h>
+ #include <errno.h>
++#include <time.h>
+ 
+ #include <libinput.h>
+ #include <linux/input-event-codes.h>
+@@ -35,13 +36,106 @@ static const struct libinput_interface interface = {
+ };
+ 
+ 
++/*
++ * libinput throws the kernel's key repeat away, "ignore kernel key repeat" in
++ * evdev-fallback.c, and leaves repeating to its caller, so to make a held key
++ * keep clicking we have to run the clock ourselves.  These are the kernel
++ * defaults, EVIOCGREP on a fresh keyboard, and what the console uses; a
++ * display server repeats at whatever rate it has been configured with, so on
++ * a desktop the clicks approximate the characters rather than track them.
++ */
++
++#define REPEAT_DELAY_MS 250
++#define REPEAT_PERIOD_MS 33
++
++static int repeat_key = -1;
++static struct timespec repeat_at;
++
++
++/*
++ * The kernel repeats whichever key went down last, modifiers included, but no
++ * display server passes those repeats on and hearing shift chatter while it is
++ * held would be odd.  Leave them out, which is also what keeps the mute
++ * sequence, three taps on scroll lock, from being drummed out by a held key.
++ */
++
++static int is_modifier(uint32_t key)
++{
++	switch(key) {
++		case KEY_LEFTSHIFT:
++		case KEY_RIGHTSHIFT:
++		case KEY_LEFTCTRL:
++		case KEY_RIGHTCTRL:
++		case KEY_LEFTALT:
++		case KEY_RIGHTALT:
++		case KEY_LEFTMETA:
++		case KEY_RIGHTMETA:
++		case KEY_CAPSLOCK:
++		case KEY_NUMLOCK:
++		case KEY_SCROLLLOCK:
++			return 1;
++		default:
++			return 0;
++	}
++}
++
++
++static void repeat_after(int ms)
++{
++	clock_gettime(CLOCK_MONOTONIC, &repeat_at);
++	repeat_at.tv_nsec += (long)ms * 1000000;
++	if(repeat_at.tv_nsec >= 1000000000) {
++		repeat_at.tv_nsec -= 1000000000;
++		repeat_at.tv_sec++;
++	}
++}
++
++
++/*
++ * Milliseconds left until the next repeat is due, 0 if it is due now and -1
++ * if no key is repeating, which is also what poll() wants for "wait forever".
++ */
++
++static int repeat_timeout(void)
++{
++	struct timespec now;
++	long long ms;
++
++	if(repeat_key < 0) {
++		return -1;
++	}
++
++	clock_gettime(CLOCK_MONOTONIC, &now);
++	ms = (long long)(repeat_at.tv_sec - now.tv_sec) * 1000
++	   + (repeat_at.tv_nsec - now.tv_nsec) / 1000000;
++
++	return ms > 0 ? (int)ms : 0;
++}
++
++
+ static void handle_key(struct libinput_event *ev)
+ {
+ 	struct libinput_event_keyboard *k = libinput_event_get_keyboard_event(ev);
+ 	enum libinput_key_state state = libinput_event_keyboard_get_key_state(k);
+ 	uint32_t key = libinput_event_keyboard_get_key(k);
++	int pressed = state == LIBINPUT_KEY_STATE_PRESSED;
+ 
+-	play(key, state == LIBINPUT_KEY_STATE_PRESSED);
++	play(key, pressed);
++
++	if(!repeat_enabled()) {
++		return;
++	}
++
++	if(pressed) {
++		/* A new key down cancels the repeat of the previous one, as
++		 * the kernel does. */
++		repeat_key = is_modifier(key) ? -1 : (int)key;
++		if(repeat_key >= 0) {
++			repeat_after(REPEAT_DELAY_MS);
++		}
++	} else if((int)key == repeat_key) {
++		repeat_key = -1;
++	}
+ }
+ 
+ static void handle_button(struct libinput_event *ev)
+@@ -120,7 +214,13 @@ int scan(int verbose)
+         fds.events = POLLIN;
+         fds.revents = 0;
+ 
+-	while(poll(&fds, 1, -1) > -1) {
++	while(poll(&fds, 1, repeat_timeout()) > -1) {
++
++		if(repeat_key >= 0 && repeat_timeout() == 0) {
++			play(repeat_key, 1);
++			repeat_after(REPEAT_PERIOD_MS);
++		}
++
+ 		handle_events(li);
+ 	}
+ 
+diff --git a/scan-x11.c b/scan-x11.c
+index 00eaf52..14d335c 100644
+--- a/scan-x11.c
++++ b/scan-x11.c
+@@ -63,11 +63,17 @@ void key_pressed_cb(XPointer arg, XRecordInterceptData *d)
+     
+ 	int key = ((unsigned char*) d->data)[1];
+ 	int type = ((unsigned char*) d->data)[0] & 0x7F;
++
++	/* The X server marks the KeyPress events it generates while a key is
++	 * held down, and sends no KeyRelease in between, so a repeat is one
++	 * extra click.  Modifiers do not repeat, XKB does not mark them as
++	 * repeating keys, so holding shift stays quiet by itself. */
++
+ 	int repeat = d->data[2] & 1;
+ 
+ 	key -= 8; /* X code to scan code? */
+ 
+-	if(!repeat) {
++	if(!repeat || repeat_enabled()) {
+ 
+ 		switch (type) {
+ 			case KeyPress:

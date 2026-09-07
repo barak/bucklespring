@@ -23,6 +23,16 @@ longer reaches the sound daemon of the user session; see
 .I /usr/share/doc/bucklespring\-libinput/README.Debian
 for the ways to grant the access, and for what each of them costs you.
 .PP
+libinput discards the key repeat the kernel generates for a held key and
+leaves repeating to its caller, so this flavour makes its own, at the kernel
+default of one click after 250 ms and one every 33 ms after that.  On the
+console that is the rate the characters appear at; under a display server the
+rate is whatever that server has been configured with, so the clicks
+approximate the typing rather than track it.  Modifier keys never repeat.
+Use
+.B \-r
+for the older behaviour, a single click however long the key is held.
+.PP
 The X11 flavour is
 .BR buckle\-x11 (1).
 Both flavours are alternatives for
@@ -51,6 +61,9 @@ list available openAL audio devices
 .TP
 \fB\-p\fR PATH
 load .wav files from directory PATH
+.TP
+\fB\-r\fR
+stay silent while a held key auto repeats
 .TP
 \fB\-s\fR WIDTH
 set stereo width [0..100]
