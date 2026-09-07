@@ -25,12 +25,20 @@ longer reaches the sound daemon of the user session; see
 for the ways to grant the access, and for what each of them costs you.
 .PP
 libinput discards the key repeat the kernel generates for a held key and
-leaves repeating to its caller, so this flavour makes its own, at the kernel
-default of one click after 250 ms and one every 33 ms after that.  On the
-console that is the rate the characters appear at; under a display server the
-rate is whatever that server has been configured with, so the clicks
-approximate the typing rather than track it.  Modifier keys never repeat.
-Use
+leaves repeating to its caller, so this flavour keeps its own clock.  Nothing
+can tell it when a repeat has actually happened: a Wayland compositor sends
+no event per repeat, it tells each client the delay and the rate once and
+every client then runs a timer of its own, so the repeats that put characters
+on the screen exist only inside whichever window has the focus.  What can be
+had is the delay and the rate themselves, and buckle asks in turn the
+compositor, which is authoritative under Wayland, then the input device,
+which is authoritative on the console, falling back on the kernel default of
+250 ms and then one click every 33 ms.  Should it still disagree with what
+you see on the screen, set it with
+.B \-\-repeat\-delay
+and
+.BR \-\-repeat\-rate .
+Modifier keys never repeat.  Use
 .B \-r
 for the older behaviour, a single click however long the key is held.
 .PP
@@ -68,6 +76,13 @@ load .wav files from directory PATH
 .TP
 \fB\-r\fR, \fB\-\-no\-repeat\fR
 stay silent while a held key auto repeats
+.TP
+\fB\-\-repeat\-delay\fR=\fI\,MS\/\fR
+wait MS before the first repeat, overriding
+what the compositor or the kernel says
+.TP
+\fB\-\-repeat\-rate\fR=\fI\,HZ\/\fR
+make HZ repeats per second, likewise
 .TP
 \fB\-s\fR, \fB\-\-stereo\-width\fR=\fI\,WIDTH\/\fR
 set stereo width [0..100]

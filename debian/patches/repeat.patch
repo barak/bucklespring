@@ -9,11 +9,29 @@ for those who preferred it the other way.
 The two backends learn of a repeat differently.  The X server marks the
 KeyPress events it generates while a key is held, which the backend already
 recognised and then deliberately threw away, and sends no KeyRelease in
-between, so there it is a matter of no longer discarding them.  libinput
-drops the kernel's repeat events outright, "ignore kernel key repeat" in
-evdev-fallback.c, and leaves repeating to its caller, so that backend times
-its own from the kernel defaults, 250 ms to the first repeat and 33 ms
-between the rest.
+between, so there it is a matter of no longer discarding them.
+
+libinput drops the kernel's repeat events outright, "ignore kernel key
+repeat" in evdev-fallback.c, and leaves repeating to its caller, so that
+backend has to keep its own clock, and the question becomes how fast to run
+it.  Wayland is no help in the way X11 is: a compositor sends no event per
+repeat at all.  It tells each client the delay and the rate once, in
+wl_keyboard.repeat_info, and every client then runs a timer of its own, so
+the repeats that put characters on the screen exist only inside whichever
+client holds the keyboard focus and there is nothing for a bystander to
+follow.  The two numbers can be had for the asking, though, and they are
+worth asking for, because a compositor keeps its setting to itself: the
+kernel's repeat, which is what EVIOCGREP on the device reports, stays at its
+250 ms and 33 ms default however the desktop is configured.  Here GNOME is
+set to 500 ms and 30 ms, so timing the clicks off the device would start them
+a quarter of a second before the first character appeared and leave them
+running ahead for as long as the key was held.
+
+So the libinput backend connects to the compositor for the sole purpose of
+reading repeat_info, and keeps the connection polled, since the setting can
+change while we run.  Failing that it asks the device, which is the right
+answer on a console, and failing that it falls back to the kernel defaults.
+--repeat-delay and --repeat-rate override the lot.
 
 The kernel repeats modifiers too, unlike XKB, so the libinput backend leaves
 them out; hearing shift chatter while it is held would be odd, and it also
@@ -21,70 +39,97 @@ keeps a held key from drumming out the mute sequence of three taps on scroll
 lock.
 Forwarded: no
 ---
- buckle.h        |   1 +
- main.c          |  19 ++++++++++-
- scan-libinput.c | 104 ++++++++++++++++++++++++++++++++++++++++++++++++++++++--
- scan-x11.c      |   8 ++++-
- 4 files changed, 128 insertions(+), 4 deletions(-)
+ Makefile        |    6 -
+ buckle.h        |    9 ++
+ main.c          |   55 ++++++++++++++
+ scan-libinput.c |  208 ++++++++++++++++++++++++++++++++++++++++++++++++++++++--
+ scan-x11.c      |    8 +-
+ wl-repeat.c     |  182 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 455 insertions(+), 13 deletions(-)
 
-diff --git a/buckle.h b/buckle.h
-index 4d22cd8..7954f8a 100644
 --- a/buckle.h
 +++ b/buckle.h
-@@ -2,6 +2,7 @@
+@@ -2,9 +2,16 @@
  #define buckle_h
  
  int play(int code, int press);
 +int repeat_enabled(void);
++void repeat_override(int *delay_ms, int *period_ms);
  int scan(int verbose);
  void printd(const char *fmt, ...);
  void open_console(void);
-diff --git a/main.c b/main.c
-index 54d89db..9fec8d5 100644
+ 
+-#endif
++/* wl-repeat.c, built only for the libinput backend */
++
++int wl_repeat_open(void);
++int wl_repeat_dispatch(void);
++int wl_repeat_get(int *delay_ms, int *period_ms);
+ 
++#endif
 --- a/main.c
 +++ b/main.c
-@@ -72,12 +72,13 @@ static int opt_stereo_width = 50;
+@@ -72,12 +72,21 @@
  static int opt_gain = 100;
  static int opt_fallback_sound = 0;
  static int opt_mute_keycode = DEFAULT_MUTE_KEYCODE;
 +static int opt_no_repeat = 0;
++static int opt_repeat_delay = 0;
++static int opt_repeat_rate = 0;
  static const char *opt_device = NULL;
  static const char *opt_path_audio = PATH_AUDIO;
  static int muted = 0;
  
  
 -static const char short_opts[] = "d:fg:hlm:Mp:s:v";
++/* Options with no short form of their own start past the character codes. */
++enum {
++	OPT_REPEAT_DELAY = 256,
++	OPT_REPEAT_RATE,
++};
++
 +static const char short_opts[] = "d:fg:hlm:Mp:rs:v";
  
  static const struct option long_opts[] = {
  	{ "device",         required_argument, NULL, 'd' },
-@@ -88,6 +89,7 @@ static const struct option long_opts[] = {
+@@ -88,6 +97,9 @@
  	{ "mute-keycode",   required_argument, NULL, 'm' },
  	{ "mute",           no_argument,       NULL, 'M' },
  	{ "audio-path",     required_argument, NULL, 'p' },
 +	{ "no-repeat",      no_argument,       NULL, 'r' },
++	{ "repeat-delay",   required_argument, NULL, OPT_REPEAT_DELAY },
++	{ "repeat-rate",    required_argument, NULL, OPT_REPEAT_RATE },
  	{ "stereo-width",   required_argument, NULL, 's' },
  	{ "verbose",        no_argument,       NULL, 'v' },
          { 0, 0, 0, 0 }
-@@ -128,6 +130,9 @@ int main(int argc, char **argv)
+@@ -128,6 +140,15 @@
  			case 'p':
  				opt_path_audio = optarg;
  				break;
 +			case 'r':
 +				opt_no_repeat = 1;
 +				break;
++			case OPT_REPEAT_DELAY:
++				opt_repeat_delay = atoi(optarg);
++				break;
++			case OPT_REPEAT_RATE:
++				opt_repeat_rate = atoi(optarg);
++				break;
  			case 's':
  				opt_stereo_width = atoi(optarg);
  				break;
-@@ -214,6 +219,7 @@ static void usage(char *exe)
+@@ -214,6 +235,10 @@
  		"  -h, --help                show help\n"
  		"  -l, --list-devices        list available OpenAL audio devices\n"
  		"  -p, --audio-path=PATH     load .wav files from directory PATH\n"
 +		"  -r, --no-repeat           stay silent while a held key auto repeats\n"
++		"      --repeat-delay=MS     wait MS before the first repeat, overriding\n"
++		"                            what the compositor or the kernel says\n"
++		"      --repeat-rate=HZ      make HZ repeats per second, likewise\n"
  		"  -s, --stereo-width=WIDTH  set stereo width [0..100]\n"
  		"  -v, --verbose             increase verbosity / debugging\n",
  		exe
-@@ -237,6 +243,17 @@ static void list_devices(void)
+@@ -237,6 +262,34 @@
  }
  
  
@@ -99,39 +144,137 @@ index 54d89db..9fec8d5 100644
 +}
 +
 +
++/*
++ * The backend works out how fast the keyboard repeats and then offers the
++ * answer here, so that anyone who disagrees with it can say so on the command
++ * line.  Values left at zero are the ones the user did not care about.
++ */
++
++void repeat_override(int *delay_ms, int *period_ms)
++{
++	if(opt_repeat_delay > 0) {
++		*delay_ms = opt_repeat_delay;
++	}
++	if(opt_repeat_rate > 0) {
++		*period_ms = 1000 / opt_repeat_rate;
++	}
++}
++
++
  void printd(const char *fmt, ...)
  {
  	if(opt_verbose) {
-diff --git a/scan-libinput.c b/scan-libinput.c
-index 30ade31..f401b41 100644
 --- a/scan-libinput.c
 +++ b/scan-libinput.c
-@@ -4,6 +4,7 @@
+@@ -4,22 +4,31 @@
  #include <sys/poll.h>
  #include <string.h>
  #include <errno.h>
 +#include <time.h>
++#include <sys/ioctl.h>
  
  #include <libinput.h>
++#include <linux/input.h>
  #include <linux/input-event-codes.h>
-@@ -35,13 +36,106 @@ static const struct libinput_interface interface = {
+ 
+ #include "buckle.h"
+ 
+ 
++static void kernel_repeat_from(int fd);
++
++
+ static int open_restricted(const char *path, int flags, void *user_data)
+ {
+ 	int fd = open(path, flags);
+ 
+ 	if(fd < 0) {
+ 		fprintf(stderr, "Failed to open %s (%s)\n", path, strerror(errno));
++		return -errno;
+ 	}
+ 
+-	return fd < 0 ? -errno : fd;
++	kernel_repeat_from(fd);
++
++	return fd;
+ }
+ 
+ 
+@@ -35,13 +44,166 @@
  };
  
  
 +/*
 + * libinput throws the kernel's key repeat away, "ignore kernel key repeat" in
 + * evdev-fallback.c, and leaves repeating to its caller, so to make a held key
-+ * keep clicking we have to run the clock ourselves.  These are the kernel
-+ * defaults, EVIOCGREP on a fresh keyboard, and what the console uses; a
-+ * display server repeats at whatever rate it has been configured with, so on
-+ * a desktop the clicks approximate the characters rather than track them.
++ * keep clicking we have to run the clock ourselves.  Three places can say how
++ * fast, each overruling the one before it:
++ *
++ *  - these, the kernel's own defaults, in case the first two say nothing;
++ *  - EVIOCGREP on the input device, which is the truth on a console;
++ *  - wl_keyboard.repeat_info from the compositor, which is the truth under
++ *    Wayland, where the kernel's setting is left at its default and ignored;
++ *  - and --repeat-delay and --repeat-rate, for when we have guessed wrong.
++ *
++ * None of them tell us when a repeat actually happens.  Under Wayland nobody
++ * could: the compositor hands every client the same two numbers and each runs
++ * its own timer, so the repeats that put characters on the screen exist only
++ * inside the focused application.  We keep time alongside it rather than
++ * following it.
 + */
 +
 +#define REPEAT_DELAY_MS 250
 +#define REPEAT_PERIOD_MS 33
 +
++static int repeat_delay_ms = REPEAT_DELAY_MS;
++static int repeat_period_ms = REPEAT_PERIOD_MS;
++
++static int kernel_delay_ms = REPEAT_DELAY_MS;
++static int kernel_period_ms = REPEAT_PERIOD_MS;
++static int kernel_known = 0;
++
 +static int repeat_key = -1;
 +static struct timespec repeat_at;
++
++
++/*
++ * Take the repeat setting from the first device that has one.  Keyboards are
++ * opened before any key can arrive on them, and in practice they all sit at
++ * the same kernel default, so there is little to be gained by tracking the
++ * devices apart.
++ */
++
++static void kernel_repeat_from(int fd)
++{
++	unsigned int rep[2];
++
++	if(kernel_known || ioctl(fd, EVIOCGREP, rep) < 0) {
++		return;
++	}
++
++	kernel_delay_ms = (int)rep[0];
++	kernel_period_ms = (int)rep[1];
++	kernel_known = 1;
++}
++
++
++/*
++ * Settle on a delay and a period, most authoritative source last.  Called
++ * again whenever the compositor changes its mind.
++ */
++
++static void repeat_refresh(void)
++{
++	int delay = kernel_delay_ms;
++	int period = kernel_period_ms;
++
++	wl_repeat_get(&delay, &period);
++	repeat_override(&delay, &period);
++
++	repeat_delay_ms = delay;
++	repeat_period_ms = period;
++
++	printd("Key repeat: %d ms delay, %d ms period", delay, period);
++}
 +
 +
 +/*
@@ -201,20 +344,22 @@ index 30ade31..f401b41 100644
  	enum libinput_key_state state = libinput_event_keyboard_get_key_state(k);
  	uint32_t key = libinput_event_keyboard_get_key(k);
 +	int pressed = state == LIBINPUT_KEY_STATE_PRESSED;
- 
--	play(key, state == LIBINPUT_KEY_STATE_PRESSED);
++
 +	play(key, pressed);
 +
 +	if(!repeat_enabled()) {
 +		return;
 +	}
-+
+ 
+-	play(key, state == LIBINPUT_KEY_STATE_PRESSED);
 +	if(pressed) {
 +		/* A new key down cancels the repeat of the previous one, as
-+		 * the kernel does. */
-+		repeat_key = is_modifier(key) ? -1 : (int)key;
++		 * the kernel does.  A period of zero is how the compositor
++		 * says that keys are not to repeat at all. */
++		repeat_key = (is_modifier(key) || repeat_period_ms <= 0)
++		           ? -1 : (int)key;
 +		if(repeat_key >= 0) {
-+			repeat_after(REPEAT_DELAY_MS);
++			repeat_after(repeat_delay_ms);
 +		}
 +	} else if((int)key == repeat_key) {
 +		repeat_key = -1;
@@ -222,26 +367,59 @@ index 30ade31..f401b41 100644
  }
  
  static void handle_button(struct libinput_event *ev)
-@@ -120,7 +214,13 @@ int scan(int verbose)
-         fds.events = POLLIN;
-         fds.revents = 0;
+@@ -115,12 +277,44 @@
  
--	while(poll(&fds, 1, -1) > -1) {
-+	while(poll(&fds, 1, repeat_timeout()) > -1) {
+ 	libinput_dispatch(li);
+ 
+-        struct pollfd fds;
+-        fds.fd = libinput_get_fd(li);
+-        fds.events = POLLIN;
+-        fds.revents = 0;
++	/* The compositor, if there is one, is polled alongside the input
++	 * devices so that a change to the repeat setting is picked up while
++	 * we are running rather than only at startup. */
++
++	struct pollfd fds[2];
++	int nfds = 1;
++
++	fds[0].fd = libinput_get_fd(li);
++	fds[0].events = POLLIN;
++	fds[0].revents = 0;
++
++	fds[1].fd = wl_repeat_open();
++	fds[1].events = POLLIN;
++	fds[1].revents = 0;
++	if(fds[1].fd >= 0) {
++		nfds = 2;
++	}
++
++	repeat_refresh();
++
++	while(poll(fds, nfds, repeat_timeout()) > -1) {
++
++		/* POLLHUP and friends matter as much as POLLIN here: once the
++		 * connection is gone its descriptor is closed, and polling a
++		 * closed descriptor would spin on POLLNVAL. */
++
++		if(nfds == 2 && fds[1].revents != 0) {
++			if(!wl_repeat_dispatch()) {
++				nfds = 1;
++			}
++			repeat_refresh();
++		}
 +
 +		if(repeat_key >= 0 && repeat_timeout() == 0) {
 +			play(repeat_key, 1);
-+			repeat_after(REPEAT_PERIOD_MS);
++			repeat_after(repeat_period_ms);
 +		}
-+
+ 
+-	while(poll(&fds, 1, -1) > -1) {
  		handle_events(li);
  	}
  
-diff --git a/scan-x11.c b/scan-x11.c
-index 00eaf52..14d335c 100644
 --- a/scan-x11.c
 +++ b/scan-x11.c
-@@ -63,11 +63,17 @@ void key_pressed_cb(XPointer arg, XRecordInterceptData *d)
+@@ -63,11 +63,17 @@
      
  	int key = ((unsigned char*) d->data)[1];
  	int type = ((unsigned char*) d->data)[0] & 0x7F;
@@ -260,3 +438,203 @@ index 00eaf52..14d335c 100644
  
  		switch (type) {
  			case KeyPress:
+--- a/Makefile
++++ b/Makefile
+@@ -32,9 +32,9 @@
+  else
+   BIN     := $(NAME)
+   ifdef libinput
+-   LIBS    += $(shell $(PKG_CONFIG) --libs openal alure libinput libudev)
+-   CFLAGS  += $(shell $(PKG_CONFIG) --cflags openal alure libinput libudev)
+-   SRC     += scan-libinput.c
++   LIBS    += $(shell $(PKG_CONFIG) --libs openal alure libinput libudev wayland-client)
++   CFLAGS  += $(shell $(PKG_CONFIG) --cflags openal alure libinput libudev wayland-client)
++   SRC     += scan-libinput.c wl-repeat.c
+   else
+    LIBS    += $(shell $(PKG_CONFIG) --libs openal alure xtst x11)
+    CFLAGS  += $(shell $(PKG_CONFIG) --cflags openal alure xtst x11)
+--- /dev/null
++++ b/wl-repeat.c
+@@ -0,0 +1,182 @@
++/*
++ * Ask the Wayland compositor how fast it repeats keys.
++ *
++ * There is nothing to listen to here.  A Wayland compositor does not send a
++ * key event per repeat the way an X server does; it tells each client the
++ * delay and the rate once, in wl_keyboard.repeat_info, and every client then
++ * runs its own timer.  So the repeats that put characters on the screen exist
++ * only inside whichever client has the keyboard focus, and the best a bystander
++ * can do is ask for the same two numbers and time its own.
++ *
++ * The numbers are worth the trouble: the compositor keeps its setting to
++ * itself, and the kernel's own repeat, which is what the input device reports,
++ * carries on at its default 250 ms and 33 ms however the desktop is configured.
++ *
++ * repeat_info arrives as soon as the wl_keyboard is created, before any key
++ * event and without needing the focus, and again whenever the setting changes,
++ * so the connection is kept open and polled rather than closed after a look.
++ */
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++#include <wayland-client.h>
++
++#include "buckle.h"
++
++static struct wl_display *display = NULL;
++static struct wl_seat *seat = NULL;
++static struct wl_keyboard *keyboard = NULL;
++
++static int have_info = 0;
++static int info_delay_ms = 0;
++static int info_rate_hz = 0;
++
++
++static void kb_repeat_info(void *data, struct wl_keyboard *kb, int32_t rate, int32_t delay)
++{
++	info_rate_hz = rate;
++	info_delay_ms = delay;
++	have_info = 1;
++}
++
++
++/* The rest of the keyboard protocol is of no interest: key events reach us
++ * through libinput, and they only come this way for the focused surface. */
++
++static void kb_keymap(void *d, struct wl_keyboard *k, uint32_t f, int32_t fd, uint32_t s) {}
++static void kb_enter(void *d, struct wl_keyboard *k, uint32_t s, struct wl_surface *w, struct wl_array *a) {}
++static void kb_leave(void *d, struct wl_keyboard *k, uint32_t s, struct wl_surface *w) {}
++static void kb_key(void *d, struct wl_keyboard *k, uint32_t s, uint32_t t, uint32_t key, uint32_t st) {}
++static void kb_modifiers(void *d, struct wl_keyboard *k, uint32_t s, uint32_t a, uint32_t b, uint32_t c, uint32_t g) {}
++
++static const struct wl_keyboard_listener keyboard_listener = {
++	.keymap      = kb_keymap,
++	.enter       = kb_enter,
++	.leave       = kb_leave,
++	.key         = kb_key,
++	.modifiers   = kb_modifiers,
++	.repeat_info = kb_repeat_info,
++};
++
++
++static void seat_capabilities(void *data, struct wl_seat *s, uint32_t caps)
++{
++	if((caps & WL_SEAT_CAPABILITY_KEYBOARD) && keyboard == NULL) {
++		keyboard = wl_seat_get_keyboard(s);
++		wl_keyboard_add_listener(keyboard, &keyboard_listener, NULL);
++	}
++}
++
++
++static void seat_name(void *data, struct wl_seat *s, const char *name) {}
++
++static const struct wl_seat_listener seat_listener = {
++	.capabilities = seat_capabilities,
++	.name         = seat_name,
++};
++
++
++static void registry_global(void *data, struct wl_registry *reg, uint32_t name,
++                            const char *iface, uint32_t version)
++{
++	/* repeat_info is version 4 of wl_keyboard; without it there is no
++	 * point in binding the seat at all. */
++
++	if(strcmp(iface, "wl_seat") == 0 && seat == NULL && version >= 4) {
++		seat = wl_registry_bind(reg, name, &wl_seat_interface, 4);
++		wl_seat_add_listener(seat, &seat_listener, NULL);
++	}
++}
++
++
++static void registry_global_remove(void *data, struct wl_registry *reg, uint32_t name) {}
++
++static const struct wl_registry_listener registry_listener = {
++	.global        = registry_global,
++	.global_remove = registry_global_remove,
++};
++
++
++/*
++ * Connect, and return a descriptor to poll for later changes to the setting,
++ * or -1 when there is no compositor to ask, which is the ordinary case on a
++ * console and under X11.
++ */
++
++int wl_repeat_open(void)
++{
++	struct wl_registry *registry;
++
++	/* Asked to connect with neither of these set, libwayland complains on
++	 * stderr, and a console session with no compositor at all is a normal
++	 * way to run.  A missing socket it passes over quietly. */
++
++	if(getenv("WAYLAND_DISPLAY") == NULL && getenv("XDG_RUNTIME_DIR") == NULL) {
++		return -1;
++	}
++
++	display = wl_display_connect(NULL);
++	if(display == NULL) {
++		return -1;
++	}
++
++	registry = wl_display_get_registry(display);
++	wl_registry_add_listener(registry, &registry_listener, NULL);
++
++	/* One round trip for the list of globals, a second for the seat to
++	 * say whether it has a keyboard, a third for repeat_info itself. */
++
++	if(wl_display_roundtrip(display) < 0 ||
++	   wl_display_roundtrip(display) < 0 ||
++	   wl_display_roundtrip(display) < 0) {
++		wl_display_disconnect(display);
++		display = NULL;
++		return -1;
++	}
++
++	return wl_display_get_fd(display);
++}
++
++
++/*
++ * Read what the compositor has to say.  Returns 0 once the connection is gone,
++ * after which the descriptor is closed and must not be polled again.
++ */
++
++int wl_repeat_dispatch(void)
++{
++	if(display == NULL) {
++		return 0;
++	}
++
++	if(wl_display_dispatch(display) < 0) {
++
++		/* The compositor went away; keep whatever it last said. */
++
++		wl_display_disconnect(display);
++		display = NULL;
++		return 0;
++	}
++
++	return 1;
++}
++
++
++/*
++ * Overwrite the timing with the compositor's, if it has told us any.  A rate
++ * of zero is the protocol's way of saying that keys are not to repeat.
++ */
++
++int wl_repeat_get(int *delay_ms, int *period_ms)
++{
++	if(!have_info) {
++		return 0;
++	}
++
++	*delay_ms = info_delay_ms;
++	*period_ms = info_rate_hz > 0 ? 1000 / info_rate_hz : 0;
++
++	return 1;
++}

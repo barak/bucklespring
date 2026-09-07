@@ -8,6 +8,7 @@ Build-Depends: debhelper-compat (= 14),
 	libxtst-dev,
 	libinput-dev [linux-any],
 	libudev-dev [linux-any],
+	libwayland-dev [linux-any],
 	po-debconf,
 	help2man,
 Standards-Version: 4.7.4
