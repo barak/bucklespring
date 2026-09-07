@@ -1,2 +1,2 @@
-debian/buckle-libinput.1
-debian/buckle-libinput.service.8
+debian/man/buckle-libinput.1
+debian/man/buckle-libinput.service.8

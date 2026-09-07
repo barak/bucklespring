@@ -1,2 +1,2 @@
-debian/buckle-x11.1
-debian/buckle-x11.service.8
+debian/man/buckle-x11.1
+debian/man/buckle-x11.service.8

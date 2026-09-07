@@ -9,6 +9,7 @@ Build-Depends: debhelper-compat (= 14),
 	libinput-dev [linux-any],
 	libudev-dev [linux-any],
 	po-debconf,
+	help2man,
 Standards-Version: 4.7.4
 Vcs-Git: https://salsa.debian.org/debian/bucklespring.git
 Vcs-Browser: https://salsa.debian.org/debian/bucklespring

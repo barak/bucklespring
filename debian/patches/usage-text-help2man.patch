@@ -1,0 +1,32 @@
+From: "Barak A. Pearlmutter" <bap@debian.org>
+Date: Mon, 7 Sep 2026 13:10:00 +0100
+Subject: capitalise Usage: and Options: in the usage text
+
+The Debian packages generate buckle-x11(1) and buckle-libinput(1) from this
+text with help2man(1), so that an option added to the program turns up in its
+manual page without anyone having to write it down a second time.  help2man
+recognises the synopsis line and the start of the option list by matching
+"Usage:" and "Options:", case sensitively, and puts everything it does not
+recognise in one undifferentiated DESCRIPTION.  Capitalising the two headings
+is also what the GNU coding standards ask for.
+Forwarded: no
+---
+ main.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/main.c b/main.c
+index 8e8f72a..54d89db 100644
+--- a/main.c
++++ b/main.c
+@@ -202,9 +202,9 @@ static void usage(char *exe)
+ {
+ 	fprintf(stderr, 
+ 		"bucklespring version " VERSION "\n"
+-		"usage: %s [options]\n"
++		"Usage: %s [options]\n"
+ 		"\n"
+-		"options:\n"
++		"Options:\n"
+ 		"\n"
+ 		"  -d, --device=DEVICE       use OpenAL audio device DEVICE\n"
+ 		"  -f, --fallback-sound      use a fallback sound for unknown keys\n"

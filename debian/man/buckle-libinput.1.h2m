@@ -1,0 +1,53 @@
+[NAME]
+buckle\-libinput \- Nostalgia bucklespring keyboard sound, libinput flavour
+
+[=DESCRIPTION]
+Buckle emulates the sound of an old IBM Model-M space saver
+bucklespring keyboard while typing.
+.PP
+It runs as a background process and plays back the sound of each key
+pressed and released on the keyboard, just as if using an IBM Model-M.
+The sound of each key has carefully been sampled, and is played back
+while simulating the proper distance and direction for a realistic 3D
+sound palette of pure nostalgic bliss.
+.PP
+This flavour reads key events straight from the raw input devices in
+.I /dev/input
+through libinput, rather than from X11, so that it also works under a Wayland
+compositor and on the console.  Those devices are not readable for ordinary
+users out of the box, and running it as root is no answer, as it then no
+longer reaches the sound daemon of the user session; see
+.I /usr/share/doc/bucklespring\-libinput/README.Debian
+for the ways to grant the access, and for what each of them costs you.
+.PP
+libinput discards the key repeat the kernel generates for a held key and
+leaves repeating to its caller, so this flavour makes its own, at the kernel
+default of one click after 250 ms and one every 33 ms after that.  On the
+console that is the rate the characters appear at; under a display server the
+rate is whatever that server has been configured with, so the clicks
+approximate the typing rather than track it.  Modifier keys never repeat.
+Use
+.B \-r
+for the older behaviour, a single click however long the key is held.
+.PP
+The X11 flavour is
+.BR buckle\-x11 (1).
+Both flavours are alternatives for
+.IR /usr/games/buckle ,
+managed by
+.BR update\-alternatives (1).
+
+[SEE ALSO]
+.BR buckle\-libinput.service (8),
+.BR buckle\-x11 (1),
+.BR update\-alternatives (1)
+
+[COPYRIGHT]
+Bucklespring was written by Ico Doornekamp and is published under the
+terms of the GNU General Public License version 2.
+.PP
+This manual page is generated from the output of
+.B buckle\-libinput \-\-help
+by
+.BR help2man (1),
+around wording written by Dominik George for the Debian project.

@@ -4,18 +4,40 @@ export DEB_BUILD_MAINT_OPTIONS=hardening=+all
 export PATH_AUDIO=/usr/share/bucklespring/wav
 
 include /usr/share/dpkg/architecture.mk
+include /usr/share/dpkg/pkg-info.mk
 
 %:
 	dh $@
+
+# The manual page for each executable is generated from its own --help output,
+# so that an option added to the program turns up in the page without anyone
+# having to write it down a second time.  Everything help2man cannot know, the
+# prose around the option list, lives in the matching .h2m include file.
+#
+# help2man has to run the program it documents, which a cross build cannot do,
+# so the generated pages are kept in the source and refreshed here only when
+# building natively.  A native build that changes one is telling you the help
+# text moved and the new page wants committing.
+help2man = help2man --no-info --no-discard-stderr \
+	--version-string=$(DEB_VERSION_UPSTREAM) \
+	--source="Nostalgia bucklespring keyboard sound" --manual="User Commands"
 
 # One binary per key event source: buckle-x11 grabs the events through X11,
 # buckle-libinput reads the raw input devices, for Wayland and the console.
 execute_after_dh_auto_build:
 	mv buckle buckle-x11
+ifeq ($(DEB_BUILD_GNU_TYPE),$(DEB_HOST_GNU_TYPE))
+	$(help2man) --include=debian/man/buckle-x11.1.h2m \
+		--output=debian/man/buckle-x11.1 ./buckle-x11
+endif
 ifeq ($(DEB_HOST_ARCH_OS),linux)
 	$(MAKE) clean
 	dh_auto_build -- libinput=1
 	mv buckle buckle-libinput
+ifeq ($(DEB_BUILD_GNU_TYPE),$(DEB_HOST_GNU_TYPE))
+	$(help2man) --include=debian/man/buckle-libinput.1.h2m \
+		--output=debian/man/buckle-libinput.1 ./buckle-libinput
+endif
 endif
 
 execute_after_dh_auto_clean:

@@ -8,13 +8,33 @@ bucklespring (1.5.1-3) UNRELEASED; urgency=medium
     input device grant to members of a group, by way of a pam_exec(8)
     hook that applies the ACL at login on the local seat, as udev's
     uaccess tag is per seat and cannot select users.
-  * New patch no-repeat.patch: play the click sound each time a key held
+  * New patch repeat.patch: play the click sound each time a key held
     down auto repeats, rather than falling silent until it is released,
     with a new option -r/--no-repeat to get the old behaviour back.  The
     X11 backend only had to stop discarding the repeat events it already
     recognised; libinput drops the kernel's repeats altogether, so that
     backend times its own, leaving out the modifier keys that no display
     server repeats.
+  * Move the manual pages to debian/man/.  Keeping buckle-*.service.8
+    directly in debian/ made dh's no-op check for dh_installsystemd glob
+    debian/*.service.* and go looking for architecture qualified service
+    files, which made it ask about the synthetic template unit package
+    names and warn "package bucklespring-x11@ is not in control info"
+    once per binary package.
+  * Generate buckle-x11.1 and buckle-libinput.1 from the --help output
+    of each executable with help2man, so that an option added to the
+    program appears in its manual page by itself; the prose around the
+    option list lives in debian/man/*.1.h2m.  help2man has to run the
+    program, so the generated pages are kept in the source and refreshed
+    only on a native build.
+  * New patch usage-text-typos.patch, from upstream: the long option is
+    spelled --audio-path, and the library is OpenAL.  Now that the
+    manual pages are generated from that text, a wrong option name there
+    became a wrong option name in the manual page.
+  * New patch usage-text-help2man.patch: capitalise Usage: and Options:
+    in the usage text, which is how help2man recognises the synopsis
+    line and the start of the option list, and what the GNU coding
+    standards ask for.
 
  -- Barak A. Pearlmutter <bap@debian.org>  Mon, 07 Sep 2026 12:33:07 +0100
 

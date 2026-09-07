@@ -1,13 +1,10 @@
-.TH BUCKLE\-X11 "1" "September 2016" "Nostalgia bucklespring keyboard sound" "User Commands"
-.SH NAME
-buckle\-x11 \-  Nostalgia bucklespring keyboard sound, X11 flavour
-.SH SYNOPSIS
-.B buckle\-x11
-[options]
-.SH DESCRIPTION
+[NAME]
+buckle\-x11 \- Nostalgia bucklespring keyboard sound, X11 flavour
+
+[=DESCRIPTION]
 Buckle emulates the sound of an old IBM Model-M space saver
 bucklespring keyboard while typing within an X session.
-
+.PP
 It runs as a background process and plays back the sound of each key
 pressed and released on the keyboard, just as if using an IBM Model-M.
 The sound of each key has carefully been sampled, and is played back
@@ -21,43 +18,21 @@ Both flavours are alternatives for
 .IR /usr/games/buckle ,
 managed by
 .BR update\-alternatives (1).
-.SH OPTIONS
-.HP
-\fB\-d\fR DEVICE
-use OpenAL audio device DEVICE
-.TP
-\fB\-f\fR
-use a fallback sound for unknown keys
-.TP
-\fB\-g\fR GAIN
-set playback gain [0..100]
-.TP
-\fB\-m\fR CODE
-set use CODE as mute key (default 0x46 for scroll lock)
-.TP
-\fB\-h\fR
-show help
-.TP
-\fB\-l\fR
-list available openAL audio devices
-.TP
-\fB\-p\fR PATH
-load .wav files from directory PATH
-.TP
-\fB\-r\fR
-stay silent while a held key auto repeats
-.TP
-\fB\-s\fR WIDTH
-set stereo width [0..100]
-.TP
-\fB\-v\fR
-increase verbosity / debugging
-.SH SEE ALSO
+.PP
+A key held down long enough to repeat clicks for every repeat.  The X server
+does not repeat the modifier keys, so holding shift stays quiet by itself.
+
+[SEE ALSO]
 .BR buckle\-x11.service (8),
 .BR buckle\-libinput (1),
 .BR update\-alternatives (1)
-.SH COPYRIGHT
+
+[COPYRIGHT]
 Bucklespring was written by Ico Doornekamp and is published under the
 terms of the GNU General Public License version 2.
-
-This manual page was written by Dominik George for the Debian project.
+.PP
+This manual page is generated from the output of
+.B buckle\-x11 \-\-help
+by
+.BR help2man (1),
+around wording written by Dominik George for the Debian project.

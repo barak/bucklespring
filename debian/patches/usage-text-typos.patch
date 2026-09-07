@@ -1,0 +1,28 @@
+From: tensorknower69 <latesight20@protonmail.com>
+Date: Fri, 29 Oct 2021 00:00:11 +0800
+Subject: fix a couple of typos in the usage text
+
+The long option is spelled --audio-path, not --audi-path, and the library is
+OpenAL.  This matters more than it used to, as the manual pages are generated
+from this text, so a wrong option name here becomes a wrong option name in
+buckle-x11(1) and buckle-libinput(1).
+Origin: upstream, https://github.com/zevv/bucklespring/commit/3178013
+---
+ main.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/main.c b/main.c
+index 08ab29b..8e8f72a 100644
+--- a/main.c
++++ b/main.c
+@@ -212,8 +212,8 @@ static void usage(char *exe)
+ 		"  -m, --mute-keycode=CODE   use CODE as mute key (default 0x46 for scroll lock)\n"
+ 		"  -M, --mute                start the program muted\n"
+ 		"  -h, --help                show help\n"
+-		"  -l, --list-devices        list available openAL audio devices\n"
+-		"  -p, --audi-path=PATH      load .wav files from directory PATH\n"
++		"  -l, --list-devices        list available OpenAL audio devices\n"
++		"  -p, --audio-path=PATH     load .wav files from directory PATH\n"
+ 		"  -s, --stereo-width=WIDTH  set stereo width [0..100]\n"
+ 		"  -v, --verbose             increase verbosity / debugging\n",
+ 		exe

@@ -40,7 +40,7 @@ index 4d22cd8..7954f8a 100644
  void printd(const char *fmt, ...);
  void open_console(void);
 diff --git a/main.c b/main.c
-index 08ab29b..c4642bc 100644
+index 54d89db..9fec8d5 100644
 --- a/main.c
 +++ b/main.c
 @@ -72,12 +72,13 @@ static int opt_stereo_width = 50;
@@ -78,8 +78,8 @@ index 08ab29b..c4642bc 100644
  				break;
 @@ -214,6 +219,7 @@ static void usage(char *exe)
  		"  -h, --help                show help\n"
- 		"  -l, --list-devices        list available openAL audio devices\n"
- 		"  -p, --audi-path=PATH      load .wav files from directory PATH\n"
+ 		"  -l, --list-devices        list available OpenAL audio devices\n"
+ 		"  -p, --audio-path=PATH     load .wav files from directory PATH\n"
 +		"  -r, --no-repeat           stay silent while a held key auto repeats\n"
  		"  -s, --stereo-width=WIDTH  set stereo width [0..100]\n"
  		"  -v, --verbose             increase verbosity / debugging\n",
