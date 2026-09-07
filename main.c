@@ -207,9 +207,9 @@ static void usage(char *exe)
 {
 	fprintf(stderr, 
 		"bucklespring version " VERSION "\n"
-		"usage: %s [options]\n"
+		"Usage: %s [options]\n"
 		"\n"
-		"options:\n"
+		"Options:\n"
 		"\n"
 		"  -d, --device=DEVICE       use OpenAL audio device DEVICE\n"
 		"  -f, --fallback-sound      use a fallback sound for unknown keys\n"
