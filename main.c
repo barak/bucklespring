@@ -56,7 +56,7 @@
 	}
 
 
-static void usage(char *exe);
+static void usage(char *exe, int status);
 static void version(char *exe);
 static void list_devices(void);
 static int parse_mouse(const char *arg);
@@ -154,7 +154,7 @@ int main(int argc, char **argv)
 				opt_gain = atoi(optarg);
 				break;
 			case 'h':
-				usage(argv[0]);
+				usage(argv[0], 0);
 				return 0;
 			case 'l':
 				list_devices();
@@ -192,7 +192,7 @@ int main(int argc, char **argv)
 				exit(0);
 				break;
 			default:
-				usage(argv[0]);
+				usage(argv[0], 1);
 				return 1;
 				break;
 		}
@@ -255,9 +255,18 @@ out:
 }
 
 
-static void usage(char *exe)
+/*
+ * Asked for with --help this goes to stdout and is the answer to a question;
+ * printed because the command line would not parse it goes to stderr and is a
+ * complaint, which is the distinction the GNU coding standards draw and what
+ * lets --help be piped into a pager without the shell losing the lot.
+ */
+
+static void usage(char *exe, int status)
 {
-	fprintf(stderr, 
+	FILE *out = status == 0 ? stdout : stderr;
+
+	fprintf(out,
 		"bucklespring version " VERSION "\n"
 		"Usage: %s [options]\n"
 		"\n"
