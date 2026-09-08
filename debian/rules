@@ -26,7 +26,7 @@ include /usr/share/dpkg/architecture.mk
 # so the generated pages are kept in the source and refreshed here only when
 # building natively.  A native build that changes one is telling you the help
 # text moved and the new page wants committing.
-help2man = help2man --no-info --no-discard-stderr \
+help2man = help2man --no-info \
 	--source="Bucklespring keyboard sound" --manual="User Commands"
 
 # One binary per key event source: buckle-x11 grabs the events through X11,

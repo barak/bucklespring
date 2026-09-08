@@ -7,3 +7,4 @@ usage-text-help2man.patch
 repeat.patch
 mouse-event-selection.patch
 version-option.patch
+usage-to-stdout.patch

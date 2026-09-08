@@ -1,0 +1,69 @@
+From: "Barak A. Pearlmutter" <bap@debian.org>
+Date: Tue, 8 Sep 2026 16:40:00 +0100
+Subject: print the usage text on stdout when it was asked for
+
+--help went to stderr, which makes it awkward to pipe into a pager or a grep
+and is not where the GNU coding standards put it: output asked for belongs on
+stdout, and only a complaint about the command line belongs on stderr.
+
+Pass the exit status down to usage() and pick the stream from it, the usual
+arrangement, so --help still reads as an answer while an unparseable option
+still reads as an error.  --version already went to stdout.
+
+Programs that document themselves with help2man no longer need to be run with
+--no-discard-stderr once both do.
+Forwarded: no
+---
+ main.c |   19 ++++++++++++++-----
+ 1 file changed, 14 insertions(+), 5 deletions(-)
+
+--- a/main.c
++++ b/main.c
+@@ -56,7 +56,7 @@
+ 	}
+ 
+ 
+-static void usage(char *exe);
++static void usage(char *exe, int status);
+ static void version(char *exe);
+ static void list_devices(void);
+ static int parse_mouse(const char *arg);
+@@ -155,7 +155,7 @@
+ 				opt_gain = atoi(optarg);
+ 				break;
+ 			case 'h':
+-				usage(argv[0]);
++				usage(argv[0], 0);
+ 				return 0;
+ 			case 'l':
+ 				list_devices();
+@@ -192,7 +192,7 @@
+ 				exit(0);
+ 				break;
+ 			default:
+-				usage(argv[0]);
++				usage(argv[0], 1);
+ 				return 1;
+ 				break;
+ 		}
+@@ -255,9 +255,18 @@
+ }
+ 
+ 
+-static void usage(char *exe)
++/*
++ * Asked for with --help this goes to stdout and is the answer to a question;
++ * printed because the command line would not parse it goes to stderr and is a
++ * complaint, which is the distinction the GNU coding standards draw and what
++ * lets --help be piped into a pager without the shell losing the lot.
++ */
++
++static void usage(char *exe, int status)
+ {
+-	fprintf(stderr, 
++	FILE *out = status == 0 ? stdout : stderr;
++
++	fprintf(out,
+ 		"bucklespring version " VERSION "\n"
+ 		"Usage: %s [options]\n"
+ 		"\n"

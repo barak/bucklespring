@@ -8,7 +8,7 @@ where it can quietly fall out of step with the program.
 
 The output follows the GNU coding standards, so help2man makes the COPYRIGHT
 and AUTHOR sections of the page out of it and neither can drift.  It goes to
-stdout, as the standards say, though the usage text still goes to stderr.
+stdout, as the standards say.
 
 The version and the package name are taken from PACKAGE_VERSION and
 PACKAGE_NAME, the names autoconf uses, behind the customary
