@@ -1,0 +1,324 @@
+From: "Barak A. Pearlmutter" <bap@debian.org>
+Date: Tue, 8 Sep 2026 10:20:00 +0100
+Subject: --mouse, to choose which mouse events click
+
+Both backends now sound the scroll wheel as well as the buttons, and between
+them they can see rather more of a mouse than the two buttons the X11 backend
+started with.  Not everybody wants all of it: a wheel that clicks is charming
+until you scroll a long page, and the thumb buttons are not what anyone
+remembers a Model M for.
+
+Add --mouse, taking a comma separated list of left, middle, right, side,
+extra, wheel and hwheel, with all, the default, and none at the ends of it.
+The list is parsed once into a bit set that both backends consult through
+mouse_enabled(), so the same name means the same thing whichever flavour is
+running, even though X numbers the buttons from one and the kernel calls them
+BTN_LEFT and friends.
+
+This also fills in what the X11 backend had been ignoring.  It played only
+buttons 1 and 3; it now knows the middle button, the wheel as buttons 4 to 7,
+and the thumb buttons as 8 and 9.  A wheel detent reaches X as a press and a
+release together, so only the press is sounded, one click per detent, which
+is what the libinput backend does with the v120 units it gets instead.
+Forwarded: no
+---
+ buckle.h        | 20 ++++++++++++++
+ main.c          | 83 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ scan-libinput.c | 25 +++++++++++++----
+ scan-x11.c      | 40 ++++++++++++++++++++++++---
+ 4 files changed, 160 insertions(+), 8 deletions(-)
+
+diff --git a/buckle.h b/buckle.h
+index 75704e6..e44d61a 100644
+--- a/buckle.h
++++ b/buckle.h
+@@ -2,6 +2,26 @@
+ #define buckle_h
+ 
+ int play(int code, int press);
++
++/*
++ * The mouse events that can be made to click, as a bit set, for --mouse.
++ * "side" and "extra" are the two thumb buttons, X buttons 8 and 9; "hwheel"
++ * is the sideways tilt or second wheel.
++ */
++
++#define MOUSE_LEFT	(1 << 0)
++#define MOUSE_MIDDLE	(1 << 1)
++#define MOUSE_RIGHT	(1 << 2)
++#define MOUSE_SIDE	(1 << 3)
++#define MOUSE_EXTRA	(1 << 4)
++#define MOUSE_WHEEL	(1 << 5)
++#define MOUSE_HWHEEL	(1 << 6)
++
++#define MOUSE_ALL	(MOUSE_LEFT | MOUSE_MIDDLE | MOUSE_RIGHT | \
++			 MOUSE_SIDE | MOUSE_EXTRA | \
++			 MOUSE_WHEEL | MOUSE_HWHEEL)
++
++int mouse_enabled(int which);
+ int repeat_enabled(void);
+ void repeat_override(int *delay_ms, int *period_ms);
+ int scan(int verbose);
+diff --git a/main.c b/main.c
+index 067fae2..e6a3c6a 100644
+--- a/main.c
++++ b/main.c
+@@ -35,6 +35,7 @@
+ 
+ static void usage(char *exe);
+ static void list_devices(void);
++static int parse_mouse(const char *arg);
+ static double find_key_loc(int code);
+ 
+ 
+@@ -73,6 +74,7 @@ static int opt_gain = 100;
+ static int opt_fallback_sound = 0;
+ static int opt_mute_keycode = DEFAULT_MUTE_KEYCODE;
+ static int opt_no_repeat = 0;
++static int opt_mouse = MOUSE_ALL;
+ static int opt_repeat_delay = 0;
+ static int opt_repeat_rate = 0;
+ static const char *opt_device = NULL;
+@@ -84,6 +86,7 @@ static int muted = 0;
+ enum {
+ 	OPT_REPEAT_DELAY = 256,
+ 	OPT_REPEAT_RATE,
++	OPT_MOUSE,
+ };
+ 
+ static const char short_opts[] = "d:fg:hlm:Mp:rs:v";
+@@ -95,6 +98,7 @@ static const struct option long_opts[] = {
+ 	{ "help",           no_argument,       NULL, 'h' },
+ 	{ "list-devices",   no_argument,       NULL, 'l' },
+ 	{ "mute-keycode",   required_argument, NULL, 'm' },
++	{ "mouse",          required_argument, NULL, OPT_MOUSE },
+ 	{ "mute",           no_argument,       NULL, 'M' },
+ 	{ "audio-path",     required_argument, NULL, 'p' },
+ 	{ "no-repeat",      no_argument,       NULL, 'r' },
+@@ -143,6 +147,9 @@ int main(int argc, char **argv)
+ 			case 'r':
+ 				opt_no_repeat = 1;
+ 				break;
++			case OPT_MOUSE:
++				opt_mouse = parse_mouse(optarg);
++				break;
+ 			case OPT_REPEAT_DELAY:
+ 				opt_repeat_delay = atoi(optarg);
+ 				break;
+@@ -230,6 +237,9 @@ static void usage(char *exe)
+ 		"  -d, --device=DEVICE       use OpenAL audio device DEVICE\n"
+ 		"  -f, --fallback-sound      use a fallback sound for unknown keys\n"
+ 		"  -g, --gain=GAIN           set playback gain [0..100]\n"
++		"      --mouse=LIST          which mouse events click: a comma separated\n"
++		"                            list of left, middle, right, side, extra,\n"
++		"                            wheel and hwheel, or all (the default) or none\n"
+ 		"  -m, --mute-keycode=CODE   use CODE as mute key (default 0x46 for scroll lock)\n"
+ 		"  -M, --mute                start the program muted\n"
+ 		"  -h, --help                show help\n"
+@@ -267,6 +277,79 @@ static void list_devices(void)
+  * repeats?  The backends ask, as each has to recognise a repeat its own way.
+  */
+ 
++/*
++ * The events --mouse can name.  "all" and "none" are the two ends of the list
++ * rather than special cases in the parser.
++ */
++
++static const struct {
++	const char *name;
++	int bits;
++} mouse_events[] = {
++	{ "left",   MOUSE_LEFT   },
++	{ "middle", MOUSE_MIDDLE },
++	{ "right",  MOUSE_RIGHT  },
++	{ "side",   MOUSE_SIDE   },
++	{ "extra",  MOUSE_EXTRA  },
++	{ "wheel",  MOUSE_WHEEL  },
++	{ "hwheel", MOUSE_HWHEEL },
++	{ "all",    MOUSE_ALL    },
++	{ "none",   0            },
++};
++
++#define N_MOUSE_EVENTS (sizeof(mouse_events) / sizeof(mouse_events[0]))
++
++
++static int parse_mouse(const char *arg)
++{
++	char *spec, *tok, *save = NULL;
++	int bits = 0;
++	size_t i;
++
++	spec = strdup(arg);
++	if(spec == NULL) {
++		fprintf(stderr, "Out of memory\n");
++		exit(1);
++	}
++
++	for(tok = strtok_r(spec, ",", &save); tok; tok = strtok_r(NULL, ",", &save)) {
++
++		for(i = 0; i < N_MOUSE_EVENTS; i++) {
++			if(strcmp(tok, mouse_events[i].name) == 0) {
++				break;
++			}
++		}
++
++		if(i == N_MOUSE_EVENTS) {
++			fprintf(stderr, "Unknown mouse event \"%s\"\n", tok);
++			fprintf(stderr, "Expected a comma separated list of:");
++			for(i = 0; i < N_MOUSE_EVENTS; i++) {
++				fprintf(stderr, " %s", mouse_events[i].name);
++			}
++			fprintf(stderr, "\n");
++			exit(1);
++		}
++
++		bits |= mouse_events[i].bits;
++	}
++
++	free(spec);
++
++	return bits;
++}
++
++
++/*
++ * Is this one of the mouse events the user asked to hear?  Asked by both
++ * backends, which name the same events by different numbers.
++ */
++
++int mouse_enabled(int which)
++{
++	return (opt_mouse & which) != 0;
++}
++
++
+ int repeat_enabled(void)
+ {
+ 	return !opt_no_repeat;
+diff --git a/scan-libinput.c b/scan-libinput.c
+index 7d231a9..c58fc3a 100644
+--- a/scan-libinput.c
++++ b/scan-libinput.c
+@@ -206,13 +206,26 @@ static void handle_key(struct libinput_event *ev)
+ 	}
+ }
+ 
++static int button_bit(uint32_t button)
++{
++	switch(button) {
++		case BTN_LEFT:   return MOUSE_LEFT;
++		case BTN_MIDDLE: return MOUSE_MIDDLE;
++		case BTN_RIGHT:  return MOUSE_RIGHT;
++		case BTN_SIDE:   return MOUSE_SIDE;
++		case BTN_EXTRA:  return MOUSE_EXTRA;
++		default:         return 0;
++	}
++}
++
++
+ static void handle_button(struct libinput_event *ev)
+ {
+ 	struct libinput_event_pointer *p = libinput_event_get_pointer_event(ev);
+ 	enum libinput_button_state state = libinput_event_pointer_get_button_state(p);
+ 	uint32_t button = libinput_event_pointer_get_button(p);
+ 
+-	if(button == BTN_LEFT || button == BTN_RIGHT)
++	if(mouse_enabled(button_bit(button)))
+ 		play(0xff, state == LIBINPUT_BUTTON_STATE_PRESSED);
+ }
+ 
+@@ -230,11 +243,11 @@ static void handle_button(struct libinput_event *ev)
+ #define WHEEL_DETENT 120
+ 
+ static void handle_scroll_axis(struct libinput_event_pointer *p,
+-		enum libinput_pointer_axis axis, int *acc)
++		enum libinput_pointer_axis axis, int which, int *acc)
+ {
+ 	double v120;
+ 
+-	if(!libinput_event_pointer_has_axis(p, axis)) {
++	if(!mouse_enabled(which) || !libinput_event_pointer_has_axis(p, axis)) {
+ 		return;
+ 	}
+ 
+@@ -255,8 +268,10 @@ static void handle_scroll(struct libinput_event *ev)
+ 
+ 	struct libinput_event_pointer *p = libinput_event_get_pointer_event(ev);
+ 
+-	handle_scroll_axis(p, LIBINPUT_POINTER_AXIS_SCROLL_VERTICAL, &acc_vert);
+-	handle_scroll_axis(p, LIBINPUT_POINTER_AXIS_SCROLL_HORIZONTAL, &acc_horz);
++	handle_scroll_axis(p, LIBINPUT_POINTER_AXIS_SCROLL_VERTICAL,
++			MOUSE_WHEEL, &acc_vert);
++	handle_scroll_axis(p, LIBINPUT_POINTER_AXIS_SCROLL_HORIZONTAL,
++			MOUSE_HWHEEL, &acc_horz);
+ }
+ 
+ 
+diff --git a/scan-x11.c b/scan-x11.c
+index 14d335c..e50546e 100644
+--- a/scan-x11.c
++++ b/scan-x11.c
+@@ -7,6 +7,39 @@
+ 
+ void key_pressed_cb(XPointer arg, XRecordInterceptData *d);
+ 
++
++/*
++ * X numbers the pointer buttons from one and puts the wheel among them:
++ * 4 and 5 are up and down, 6 and 7 are the sideways pair, and 8 and 9 are the
++ * thumb buttons.  Anything above that is a button we have no name for.
++ */
++
++static int button_bit(int button)
++{
++	switch(button) {
++		case 1: return MOUSE_LEFT;
++		case 2: return MOUSE_MIDDLE;
++		case 3: return MOUSE_RIGHT;
++		case 4:
++		case 5: return MOUSE_WHEEL;
++		case 6:
++		case 7: return MOUSE_HWHEEL;
++		case 8: return MOUSE_SIDE;
++		case 9: return MOUSE_EXTRA;
++		default: return 0;
++	}
++}
++
++
++/* A wheel detent arrives as a press and a release in immediate succession.
++ * Sounding both would make two clicks out of one notch, so only the press is
++ * played, which is what the libinput backend does with a detent as well. */
++
++static int is_wheel(int button)
++{
++	return button >= 4 && button <= 7;
++}
++
+ int scan(int verbose)
+ {
+ 	/* Initialize and start Xrecord context */
+@@ -61,7 +94,8 @@ void key_pressed_cb(XPointer arg, XRecordInterceptData *d)
+ 	if (d->category != XRecordFromServer)
+ 		return;
+     
+-	int key = ((unsigned char*) d->data)[1];
++	int detail = ((unsigned char*) d->data)[1];
++	int key = detail;
+ 	int type = ((unsigned char*) d->data)[0] & 0x7F;
+ 
+ 	/* The X server marks the KeyPress events it generates while a key is
+@@ -83,11 +117,11 @@ void key_pressed_cb(XPointer arg, XRecordInterceptData *d)
+ 				play(key, 0);
+ 				break;
+ 			case ButtonPress:
+-				if(key == -5 || key == -7)
++				if(mouse_enabled(button_bit(detail)))
+ 					play(0xff, 1);
+ 				break;
+ 			case ButtonRelease:
+-				if(key == -5 || key == -7)
++				if(!is_wheel(detail) && mouse_enabled(button_bit(detail)))
+ 					play(0xff, 0);
+ 				break;
+ 			default:

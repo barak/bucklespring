@@ -38,6 +38,14 @@ Modifier keys never repeat.  Use
 .B \-r
 for the older behaviour, a single click however long the key is held.
 .PP
+The mouse clicks too: the buttons, and the scroll wheel, one click per detent.
+Two fingers scrolling on a touchpad make no sound, having no detents to make
+one for.  Use
+.B \-\-mouse
+to pick out only some of it, or to silence it altogether.  Reading the mouse
+needs access to the pointer devices as well as the keyboard ones, which the
+shipped udev rule grants together.
+.PP
 The X11 flavour is
 .BR buckle\-x11 (1).
 Both flavours are alternatives for

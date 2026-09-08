@@ -19,6 +19,11 @@ Both flavours are alternatives for
 managed by
 .BR update\-alternatives (1).
 .PP
+The mouse clicks too: the buttons, and the scroll wheel, one click per detent.
+Use
+.B \-\-mouse
+to pick out only some of it, or to silence it altogether.
+.PP
 A key held down long enough to repeat clicks for every repeat.  The X server
 does not repeat the modifier keys, so holding shift stays quiet by itself.
 

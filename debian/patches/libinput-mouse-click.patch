@@ -1,18 +1,24 @@
 From: "Barak A. Pearlmutter" <bap@debian.org>
 Date: Mon, 31 Aug 2026 18:10:00 +0100
-Subject: libinput: play the click sound on mouse buttons
+Subject: libinput: click on mouse buttons and the scroll wheel
 
-The X11 backend plays the ff-*.wav click sound on left and right mouse
-buttons, honouring --no-click; the libinput backend only ever looked at
-keyboard events.  Handle pointer button events there too, so that the two
-backends behave the same.
+The X11 backend plays the ff-*.wav click sound on the left and right mouse
+buttons; the libinput backend only ever looked at keyboard events.  Handle
+pointer buttons there too, so that the two backends behave the same.
+
+Sound the scroll wheel as well, which neither backend did.  A wheel reports
+in the v120 units libinput took from Windows, 120 to a detent, and a high
+resolution wheel sends fractions of that, so the remainder is carried to the
+next event rather than rounded away.  A detent has no press and release of
+its own, so it makes a single click.  Only a wheel is followed, not the
+smooth two finger scrolling of a touchpad, which has no detents to click for.
 Forwarded: no
 ---
- scan-libinput.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ scan-libinput.c | 61 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 61 insertions(+)
 
 diff --git a/scan-libinput.c b/scan-libinput.c
-index b503e9a..30ade31 100644
+index b503e9a..88456b2 100644
 --- a/scan-libinput.c
 +++ b/scan-libinput.c
 @@ -6,6 +6,7 @@
@@ -23,7 +29,7 @@ index b503e9a..30ade31 100644
  
  #include "buckle.h"
  
-@@ -43,6 +44,16 @@ static void handle_key(struct libinput_event *ev)
+@@ -43,6 +44,60 @@ static void handle_key(struct libinput_event *ev)
  	play(key, state == LIBINPUT_KEY_STATE_PRESSED);
  }
  
@@ -37,15 +43,62 @@ index b503e9a..30ade31 100644
 +		play(0xff, state == LIBINPUT_BUTTON_STATE_PRESSED);
 +}
 +
++/*
++ * A wheel detent is 120 units, the v120 convention libinput took from Windows.
++ * A high resolution wheel reports fractions of that, so what is left over is
++ * carried to the next event rather than rounded away.  Unlike a button there
++ * is no press and release to follow, so a detent makes a single click.
++ *
++ * Only a real wheel is handled, not LIBINPUT_EVENT_POINTER_SCROLL_FINGER or
++ * _CONTINUOUS: two fingers on a touchpad scroll smoothly rather than in
++ * detents, and there is nothing there to click once per.
++ */
++
++#define WHEEL_DETENT 120
++
++static void handle_scroll_axis(struct libinput_event_pointer *p,
++		enum libinput_pointer_axis axis, int *acc)
++{
++	double v120;
++
++	if(!libinput_event_pointer_has_axis(p, axis)) {
++		return;
++	}
++
++	v120 = libinput_event_pointer_get_scroll_value_v120(p, axis);
++	*acc += (int)(v120 < 0 ? -v120 : v120);
++
++	while(*acc >= WHEEL_DETENT) {
++		play(0xff, 1);
++		*acc -= WHEEL_DETENT;
++	}
++}
++
++
++static void handle_scroll(struct libinput_event *ev)
++{
++	static int acc_vert = 0;
++	static int acc_horz = 0;
++
++	struct libinput_event_pointer *p = libinput_event_get_pointer_event(ev);
++
++	handle_scroll_axis(p, LIBINPUT_POINTER_AXIS_SCROLL_VERTICAL, &acc_vert);
++	handle_scroll_axis(p, LIBINPUT_POINTER_AXIS_SCROLL_HORIZONTAL, &acc_horz);
++}
++
++
  static void handle_events(struct libinput *li)
  {
  	struct libinput_event *ev;
-@@ -55,6 +66,9 @@ static void handle_events(struct libinput *li)
+@@ -55,6 +110,12 @@ static void handle_events(struct libinput *li)
  			case LIBINPUT_EVENT_KEYBOARD_KEY:
  				handle_key(ev);
  				break;
 +			case LIBINPUT_EVENT_POINTER_BUTTON:
 +				handle_button(ev);
++				break;
++			case LIBINPUT_EVENT_POINTER_SCROLL_WHEEL:
++				handle_scroll(ev);
 +				break;
  			default:
  				break;

@@ -39,14 +39,34 @@ keeps a held key from drumming out the mute sequence of three taps on scroll
 lock.
 Forwarded: no
 ---
- Makefile        |    6 -
- buckle.h        |    9 ++
- main.c          |   55 ++++++++++++++
- scan-libinput.c |  208 ++++++++++++++++++++++++++++++++++++++++++++++++++++++--
- scan-x11.c      |    8 +-
- wl-repeat.c     |  182 +++++++++++++++++++++++++++++++++++++++++++++++++
+ Makefile        |   6 +-
+ buckle.h        |   9 ++-
+ main.c          |  55 ++++++++++++++-
+ scan-libinput.c | 208 ++++++++++++++++++++++++++++++++++++++++++++++++++++++--
+ scan-x11.c      |   8 ++-
+ wl-repeat.c     | 182 +++++++++++++++++++++++++++++++++++++++++++++++++
  6 files changed, 455 insertions(+), 13 deletions(-)
+ create mode 100644 wl-repeat.c
 
+diff --git a/Makefile b/Makefile
+index 8b29394..183b379 100644
+--- a/Makefile
++++ b/Makefile
+@@ -32,9 +32,9 @@ else
+  else
+   BIN     := $(NAME)
+   ifdef libinput
+-   LIBS    += $(shell $(PKG_CONFIG) --libs openal alure libinput libudev)
+-   CFLAGS  += $(shell $(PKG_CONFIG) --cflags openal alure libinput libudev)
+-   SRC     += scan-libinput.c
++   LIBS    += $(shell $(PKG_CONFIG) --libs openal alure libinput libudev wayland-client)
++   CFLAGS  += $(shell $(PKG_CONFIG) --cflags openal alure libinput libudev wayland-client)
++   SRC     += scan-libinput.c wl-repeat.c
+   else
+    LIBS    += $(shell $(PKG_CONFIG) --libs openal alure xtst x11)
+    CFLAGS  += $(shell $(PKG_CONFIG) --cflags openal alure xtst x11)
+diff --git a/buckle.h b/buckle.h
+index 4d22cd8..75704e6 100644
 --- a/buckle.h
 +++ b/buckle.h
 @@ -2,9 +2,16 @@
@@ -67,9 +87,11 @@ Forwarded: no
 +int wl_repeat_get(int *delay_ms, int *period_ms);
  
 +#endif
+diff --git a/main.c b/main.c
+index 54d89db..067fae2 100644
 --- a/main.c
 +++ b/main.c
-@@ -72,12 +72,21 @@
+@@ -72,12 +72,21 @@ static int opt_stereo_width = 50;
  static int opt_gain = 100;
  static int opt_fallback_sound = 0;
  static int opt_mute_keycode = DEFAULT_MUTE_KEYCODE;
@@ -92,7 +114,7 @@ Forwarded: no
  
  static const struct option long_opts[] = {
  	{ "device",         required_argument, NULL, 'd' },
-@@ -88,6 +97,9 @@
+@@ -88,6 +97,9 @@ static const struct option long_opts[] = {
  	{ "mute-keycode",   required_argument, NULL, 'm' },
  	{ "mute",           no_argument,       NULL, 'M' },
  	{ "audio-path",     required_argument, NULL, 'p' },
@@ -102,7 +124,7 @@ Forwarded: no
  	{ "stereo-width",   required_argument, NULL, 's' },
  	{ "verbose",        no_argument,       NULL, 'v' },
          { 0, 0, 0, 0 }
-@@ -128,6 +140,15 @@
+@@ -128,6 +140,15 @@ int main(int argc, char **argv)
  			case 'p':
  				opt_path_audio = optarg;
  				break;
@@ -118,7 +140,7 @@ Forwarded: no
  			case 's':
  				opt_stereo_width = atoi(optarg);
  				break;
-@@ -214,6 +235,10 @@
+@@ -214,6 +235,10 @@ static void usage(char *exe)
  		"  -h, --help                show help\n"
  		"  -l, --list-devices        list available OpenAL audio devices\n"
  		"  -p, --audio-path=PATH     load .wav files from directory PATH\n"
@@ -129,7 +151,7 @@ Forwarded: no
  		"  -s, --stereo-width=WIDTH  set stereo width [0..100]\n"
  		"  -v, --verbose             increase verbosity / debugging\n",
  		exe
-@@ -237,6 +262,34 @@
+@@ -237,6 +262,34 @@ static void list_devices(void)
  }
  
  
@@ -164,6 +186,8 @@ Forwarded: no
  void printd(const char *fmt, ...)
  {
  	if(opt_verbose) {
+diff --git a/scan-libinput.c b/scan-libinput.c
+index 88456b2..7d231a9 100644
 --- a/scan-libinput.c
 +++ b/scan-libinput.c
 @@ -4,22 +4,31 @@
@@ -199,7 +223,7 @@ Forwarded: no
  }
  
  
-@@ -35,13 +44,166 @@
+@@ -35,13 +44,166 @@ static const struct libinput_interface interface = {
  };
  
  
@@ -367,7 +391,7 @@ Forwarded: no
  }
  
  static void handle_button(struct libinput_event *ev)
-@@ -115,12 +277,44 @@
+@@ -162,12 +324,44 @@ int scan(int verbose)
  
  	libinput_dispatch(li);
  
@@ -417,9 +441,11 @@ Forwarded: no
  		handle_events(li);
  	}
  
+diff --git a/scan-x11.c b/scan-x11.c
+index 00eaf52..14d335c 100644
 --- a/scan-x11.c
 +++ b/scan-x11.c
-@@ -63,11 +63,17 @@
+@@ -63,11 +63,17 @@ void key_pressed_cb(XPointer arg, XRecordInterceptData *d)
      
  	int key = ((unsigned char*) d->data)[1];
  	int type = ((unsigned char*) d->data)[0] & 0x7F;
@@ -438,21 +464,9 @@ Forwarded: no
  
  		switch (type) {
  			case KeyPress:
---- a/Makefile
-+++ b/Makefile
-@@ -32,9 +32,9 @@
-  else
-   BIN     := $(NAME)
-   ifdef libinput
--   LIBS    += $(shell $(PKG_CONFIG) --libs openal alure libinput libudev)
--   CFLAGS  += $(shell $(PKG_CONFIG) --cflags openal alure libinput libudev)
--   SRC     += scan-libinput.c
-+   LIBS    += $(shell $(PKG_CONFIG) --libs openal alure libinput libudev wayland-client)
-+   CFLAGS  += $(shell $(PKG_CONFIG) --cflags openal alure libinput libudev wayland-client)
-+   SRC     += scan-libinput.c wl-repeat.c
-   else
-    LIBS    += $(shell $(PKG_CONFIG) --libs openal alure xtst x11)
-    CFLAGS  += $(shell $(PKG_CONFIG) --cflags openal alure xtst x11)
+diff --git a/wl-repeat.c b/wl-repeat.c
+new file mode 100644
+index 0000000..b4fb473
 --- /dev/null
 +++ b/wl-repeat.c
 @@ -0,0 +1,182 @@

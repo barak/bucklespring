@@ -23,6 +23,11 @@ Both flavours are alternatives for
 managed by
 .BR update\-alternatives (1).
 .PP
+The mouse clicks too: the buttons, and the scroll wheel, one click per detent.
+Use
+.B \-\-mouse
+to pick out only some of it, or to silence it altogether.
+.PP
 A key held down long enough to repeat clicks for every repeat.  The X server
 does not repeat the modifier keys, so holding shift stays quiet by itself.
 .SH OPTIONS
@@ -35,6 +40,11 @@ use a fallback sound for unknown keys
 .TP
 \fB\-g\fR, \fB\-\-gain\fR=\fI\,GAIN\/\fR
 set playback gain [0..100]
+.TP
+\fB\-\-mouse\fR=\fI\,LIST\/\fR
+which mouse events click: a comma separated
+list of left, middle, right, side, extra,
+wheel and hwheel, or all (the default) or none
 .TP
 \fB\-m\fR, \fB\-\-mute\-keycode\fR=\fI\,CODE\/\fR
 use CODE as mute key (default 0x46 for scroll lock)

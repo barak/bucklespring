@@ -43,6 +43,16 @@ bucklespring (1.5.1-3) UNRELEASED; urgency=medium
     in the usage text, which is how help2man recognises the synopsis
     line and the start of the option list, and what the GNU coding
     standards ask for.
+  * New patch mouse-event-selection.patch, and extend libinput-mouse-
+    click.patch: sound the scroll wheel, one click per detent, in both
+    flavours, and add --mouse to choose which mouse events click, a
+    comma separated list of left, middle, right, side, extra, wheel and
+    hwheel, with all, the default, and none at the ends of it.  This
+    also fills in what the X11 backend had been ignoring: it played
+    buttons 1 and 3 only, and now knows the middle and thumb buttons
+    too.  Two fingers scrolling a touchpad stay silent, having no
+    detents.  The udev rule needs no change, a wheel being on a device
+    that already has ID_INPUT_MOUSE set.
 
  -- Barak A. Pearlmutter <bap@debian.org>  Mon, 07 Sep 2026 12:33:07 +0100
 
