@@ -1,3 +1,26 @@
+/*
+ * Autoconf writes the package name and version into config.h; the Makefile
+ * shipped with the source passes VERSION on the command line instead.  Take
+ * whichever is there, under the names autoconf uses, so that moving the build
+ * to autoconf and automake needs nothing here beyond AC_CONFIG_HEADERS: the
+ * fallbacks simply stop being reached.
+ *
+ * This has to come before the system headers, as config.h is where autoconf
+ * puts the feature test macros that decide what they declare.
+ */
+
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+#ifndef PACKAGE_NAME
+#define PACKAGE_NAME "bucklespring"
+#endif
+
+#ifndef PACKAGE_VERSION
+#define PACKAGE_VERSION VERSION
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,6 +57,7 @@
 
 
 static void usage(char *exe);
+static void version(char *exe);
 static void list_devices(void);
 static int parse_mouse(const char *arg);
 static double find_key_loc(int code);
@@ -88,7 +112,7 @@ enum {
 	OPT_REPEAT_RATE,
 };
 
-static const char short_opts[] = "d:fg:hlm:Mp:rs:c::v";
+static const char short_opts[] = "d:fg:hlm:Mp:rs:c::vV";
 
 static const struct option long_opts[] = {
 	{ "device",         required_argument, NULL, 'd' },
@@ -105,6 +129,7 @@ static const struct option long_opts[] = {
 	{ "stereo-width",   required_argument, NULL, 's' },
 	{ "no-click",       optional_argument, NULL, 'c' },
 	{ "verbose",        no_argument,       NULL, 'v' },
+	{ "version",        no_argument,       NULL, 'V' },
         { 0, 0, 0, 0 }
 };
 
@@ -161,6 +186,10 @@ int main(int argc, char **argv)
 				break;
 			case 'v':
 				opt_verbose++;
+				break;
+			case 'V':
+				version(argv[0]);
+				exit(0);
 				break;
 			default:
 				usage(argv[0]);
@@ -250,10 +279,39 @@ static void usage(char *exe)
 		"                            what the compositor or the kernel says\n"
 		"      --repeat-rate=HZ      make HZ repeats per second, likewise\n"
 		"  -s, --stereo-width=WIDTH  set stereo width [0..100]\n"
-		"  -v, --verbose             increase verbosity / debugging\n",
+		"  -v, --verbose             increase verbosity / debugging\n"
+		"  -V, --version             show version and exit\n",
 		exe
        );
 }
+
+/*
+ * --version in the shape the GNU coding standards ask for: the program, the
+ * package it belongs to and the version on the first line, then the copyright,
+ * the licence and the author.  On stdout, where the standards put it, even
+ * though the usage text goes to stderr.
+ *
+ * help2man reads the lot: the first line gives the version stamped in the page
+ * footer, and it turns the rest into the COPYRIGHT and AUTHOR sections, so
+ * neither can drift away from the program.
+ */
+
+static void version(char *exe)
+{
+	const char *name = strrchr(exe, '/');
+
+	printf("%s (%s) %s\n", name ? name + 1 : exe,
+			PACKAGE_NAME, PACKAGE_VERSION);
+	printf("Copyright (C) 2016-2025 Ico Doornekamp\n");
+	printf("License GPLv2+: GNU GPL version 2 or later"
+			" <https://gnu.org/licenses/gpl.html>.\n");
+	printf("This is free software: you are free to"
+			" change and redistribute it.\n");
+	printf("There is NO WARRANTY, to the extent permitted by law.\n");
+	printf("\n");
+	printf("Written by Ico Doornekamp.\n");
+}
+
 
 static void list_devices(void)
 {
