@@ -53,6 +53,19 @@ bucklespring (1.5.1-3) UNRELEASED; urgency=medium
     too.  Two fingers scrolling a touchpad stay silent, having no
     detents.  The udev rule needs no change, a wheel being on a device
     that already has ID_INPUT_MOUSE set.
+  * New patch version-option.patch: add -V/--version, printing the GNU
+    standard version block.  The version and package name come from
+    PACKAGE_VERSION and PACKAGE_NAME behind the customary HAVE_CONFIG_H
+    include, with #ifndef fallbacks to what the shipped Makefile passes,
+    so that moving upstream to autoconf and automake would need only
+    AC_CONFIG_HEADERS.  help2man makes the COPYRIGHT and AUTHOR sections
+    of the manual pages out of that output, so debian/rules need no
+    longer pass --version-string, nor include pkg-info.mk to work one
+    out.
+  * Shorten the --source passed to help2man to "Bucklespring keyboard
+    sound".  At 27 characters it fits the page footer, where the 37 of
+    the description previously passed overran the 32 groff has room for
+    there at the default 80 columns and came out ellipsised.
 
  -- Barak A. Pearlmutter <bap@debian.org>  Mon, 07 Sep 2026 12:33:07 +0100
 

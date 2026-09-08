@@ -1,0 +1,137 @@
+From: "Barak A. Pearlmutter" <bap@debian.org>
+Date: Tue, 8 Sep 2026 14:05:00 +0100
+Subject: add --version
+
+Every other program has one, and help2man wants one: without it the version
+in the manual page footer has to be passed in on the side, from the packaging,
+where it can quietly fall out of step with the program.
+
+The output follows the GNU coding standards, so help2man makes the COPYRIGHT
+and AUTHOR sections of the page out of it and neither can drift.  It goes to
+stdout, as the standards say, though the usage text still goes to stderr.
+
+The version and the package name are taken from PACKAGE_VERSION and
+PACKAGE_NAME, the names autoconf uses, behind the customary
+
+    #ifdef HAVE_CONFIG_H
+    #include <config.h>
+    #endif
+
+and #ifndef fallbacks to what the shipped Makefile passes in.  Should the
+build ever move to autoconf and automake, AC_CONFIG_HEADERS is then the whole
+of the change: the fallbacks stop being reached and nothing here is touched.
+The include sits above the system headers, which is where it has to be, as
+config.h is where autoconf puts the feature test macros that decide what those
+headers declare.
+Forwarded: no
+---
+ main.c |   62 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 60 insertions(+), 2 deletions(-)
+
+--- a/main.c
++++ b/main.c
+@@ -1,3 +1,26 @@
++/*
++ * Autoconf writes the package name and version into config.h; the Makefile
++ * shipped with the source passes VERSION on the command line instead.  Take
++ * whichever is there, under the names autoconf uses, so that moving the build
++ * to autoconf and automake needs nothing here beyond AC_CONFIG_HEADERS: the
++ * fallbacks simply stop being reached.
++ *
++ * This has to come before the system headers, as config.h is where autoconf
++ * puts the feature test macros that decide what they declare.
++ */
++
++#ifdef HAVE_CONFIG_H
++#include <config.h>
++#endif
++
++#ifndef PACKAGE_NAME
++#define PACKAGE_NAME "bucklespring"
++#endif
++
++#ifndef PACKAGE_VERSION
++#define PACKAGE_VERSION VERSION
++#endif
++
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+@@ -34,6 +57,7 @@
+ 
+ 
+ static void usage(char *exe);
++static void version(char *exe);
+ static void list_devices(void);
+ static int parse_mouse(const char *arg);
+ static double find_key_loc(int code);
+@@ -89,7 +113,7 @@
+ 	OPT_MOUSE,
+ };
+ 
+-static const char short_opts[] = "d:fg:hlm:Mp:rs:v";
++static const char short_opts[] = "d:fg:hlm:Mp:rs:vV";
+ 
+ static const struct option long_opts[] = {
+ 	{ "device",         required_argument, NULL, 'd' },
+@@ -106,6 +130,7 @@
+ 	{ "repeat-rate",    required_argument, NULL, OPT_REPEAT_RATE },
+ 	{ "stereo-width",   required_argument, NULL, 's' },
+ 	{ "verbose",        no_argument,       NULL, 'v' },
++	{ "version",        no_argument,       NULL, 'V' },
+         { 0, 0, 0, 0 }
+ };
+ 
+@@ -162,6 +187,10 @@
+ 			case 'v':
+ 				opt_verbose++;
+ 				break;
++			case 'V':
++				version(argv[0]);
++				exit(0);
++				break;
+ 			default:
+ 				usage(argv[0]);
+ 				return 1;
+@@ -250,11 +279,40 @@
+ 		"                            what the compositor or the kernel says\n"
+ 		"      --repeat-rate=HZ      make HZ repeats per second, likewise\n"
+ 		"  -s, --stereo-width=WIDTH  set stereo width [0..100]\n"
+-		"  -v, --verbose             increase verbosity / debugging\n",
++		"  -v, --verbose             increase verbosity / debugging\n"
++		"  -V, --version             show version and exit\n",
+ 		exe
+        );
+ }
+ 
++/*
++ * --version in the shape the GNU coding standards ask for: the program, the
++ * package it belongs to and the version on the first line, then the copyright,
++ * the licence and the author.  On stdout, where the standards put it, even
++ * though the usage text goes to stderr.
++ *
++ * help2man reads the lot: the first line gives the version stamped in the page
++ * footer, and it turns the rest into the COPYRIGHT and AUTHOR sections, so
++ * neither can drift away from the program.
++ */
++
++static void version(char *exe)
++{
++	const char *name = strrchr(exe, '/');
++
++	printf("%s (%s) %s\n", name ? name + 1 : exe,
++			PACKAGE_NAME, PACKAGE_VERSION);
++	printf("Copyright (C) 2016-2025 Ico Doornekamp\n");
++	printf("License GPLv2+: GNU GPL version 2 or later"
++			" <https://gnu.org/licenses/gpl.html>.\n");
++	printf("This is free software: you are free to"
++			" change and redistribute it.\n");
++	printf("There is NO WARRANTY, to the extent permitted by law.\n");
++	printf("\n");
++	printf("Written by Ico Doornekamp.\n");
++}
++
++
+ static void list_devices(void)
+ {
+ 	const ALCchar *devices = alcGetString(NULL, ALC_DEVICE_SPECIFIER);

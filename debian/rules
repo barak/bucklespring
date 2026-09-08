@@ -4,7 +4,6 @@ export DEB_BUILD_MAINT_OPTIONS=hardening=+all
 export PATH_AUDIO=/usr/share/bucklespring/wav
 
 include /usr/share/dpkg/architecture.mk
-include /usr/share/dpkg/pkg-info.mk
 
 %:
 	dh $@
@@ -14,13 +13,21 @@ include /usr/share/dpkg/pkg-info.mk
 # having to write it down a second time.  Everything help2man cannot know, the
 # prose around the option list, lives in the matching .h2m include file.
 #
+# The COPYRIGHT and AUTHOR sections are made out of --version, so nothing here
+# has to know the version or repeat the licence.
+#
+# --source is what the left of the page footer shows.  Keep it under 32
+# characters: groff has that much room for it at the default 80 columns and
+# ellipsises the rest, which is what became of the longer description that
+# used to be here.  Passing it at all costs the version its place in the
+# footer, help2man having nowhere else to put it, which is the trade taken.
+#
 # help2man has to run the program it documents, which a cross build cannot do,
 # so the generated pages are kept in the source and refreshed here only when
 # building natively.  A native build that changes one is telling you the help
 # text moved and the new page wants committing.
 help2man = help2man --no-info --no-discard-stderr \
-	--version-string=$(DEB_VERSION_UPSTREAM) \
-	--source="Nostalgia bucklespring keyboard sound" --manual="User Commands"
+	--source="Bucklespring keyboard sound" --manual="User Commands"
 
 # One binary per key event source: buckle-x11 grabs the events through X11,
 # buckle-libinput reads the raw input devices, for Wayland and the console.

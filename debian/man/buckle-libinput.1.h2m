@@ -1,3 +1,11 @@
+This file is a help2man include.  A [section] block goes in at the start of
+that section and a [=section] block replaces it, while a /pattern/ block goes
+in after the paragraph matching the pattern.  The note at the foot of this
+file is attached to a pattern so that it lands at the end of COPYRIGHT, after
+the copyright help2man makes out of --version, rather than ahead of it.
+Should help2man's wording ever change, that note goes missing rather than
+turning up in the wrong place.
+
 [NAME]
 buckle\-libinput \- Nostalgia bucklespring keyboard sound, libinput flavour
 
@@ -58,12 +66,12 @@ managed by
 .BR buckle\-x11 (1),
 .BR update\-alternatives (1)
 
-[COPYRIGHT]
-Bucklespring was written by Ico Doornekamp and is published under the
-terms of the GNU General Public License version 2.
+/NO WARRANTY/
 .PP
 This manual page is generated from the output of
 .B buckle\-libinput \-\-help
+and
+.B \-\-version
 by
 .BR help2man (1),
 around wording written by Dominik George for the Debian project.

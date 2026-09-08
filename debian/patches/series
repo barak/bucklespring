@@ -6,3 +6,4 @@ usage-text-typos.patch
 usage-text-help2man.patch
 repeat.patch
 mouse-event-selection.patch
+version-option.patch
