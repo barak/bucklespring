@@ -206,13 +206,26 @@ static void handle_key(struct libinput_event *ev)
 	}
 }
 
+static int button_bit(uint32_t button)
+{
+	switch(button) {
+		case BTN_LEFT:   return MOUSE_LEFT;
+		case BTN_MIDDLE: return MOUSE_MIDDLE;
+		case BTN_RIGHT:  return MOUSE_RIGHT;
+		case BTN_SIDE:   return MOUSE_SIDE;
+		case BTN_EXTRA:  return MOUSE_EXTRA;
+		default:         return 0;
+	}
+}
+
+
 static void handle_button(struct libinput_event *ev)
 {
 	struct libinput_event_pointer *p = libinput_event_get_pointer_event(ev);
 	enum libinput_button_state state = libinput_event_pointer_get_button_state(p);
 	uint32_t button = libinput_event_pointer_get_button(p);
 
-	if(button == BTN_LEFT || button == BTN_RIGHT)
+	if(mouse_enabled(button_bit(button)))
 		play(0xff, state == LIBINPUT_BUTTON_STATE_PRESSED);
 }
 
@@ -230,11 +243,11 @@ static void handle_button(struct libinput_event *ev)
 #define WHEEL_DETENT 120
 
 static void handle_scroll_axis(struct libinput_event_pointer *p,
-		enum libinput_pointer_axis axis, int *acc)
+		enum libinput_pointer_axis axis, int which, int *acc)
 {
 	double v120;
 
-	if(!libinput_event_pointer_has_axis(p, axis)) {
+	if(!mouse_enabled(which) || !libinput_event_pointer_has_axis(p, axis)) {
 		return;
 	}
 
@@ -255,8 +268,10 @@ static void handle_scroll(struct libinput_event *ev)
 
 	struct libinput_event_pointer *p = libinput_event_get_pointer_event(ev);
 
-	handle_scroll_axis(p, LIBINPUT_POINTER_AXIS_SCROLL_VERTICAL, &acc_vert);
-	handle_scroll_axis(p, LIBINPUT_POINTER_AXIS_SCROLL_HORIZONTAL, &acc_horz);
+	handle_scroll_axis(p, LIBINPUT_POINTER_AXIS_SCROLL_VERTICAL,
+			MOUSE_WHEEL, &acc_vert);
+	handle_scroll_axis(p, LIBINPUT_POINTER_AXIS_SCROLL_HORIZONTAL,
+			MOUSE_HWHEEL, &acc_horz);
 }
 
 

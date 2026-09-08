@@ -35,6 +35,7 @@
 
 static void usage(char *exe);
 static void list_devices(void);
+static int parse_mouse(const char *arg);
 static double find_key_loc(int code);
 
 
@@ -68,12 +69,12 @@ static double midloc[] = {
 };
 
 static int opt_verbose = 0;
-static int opt_no_click = 0;
 static int opt_stereo_width = 50;
 static int opt_gain = 100;
 static int opt_fallback_sound = 0;
 static int opt_mute_keycode = DEFAULT_MUTE_KEYCODE;
 static int opt_no_repeat = 0;
+static int opt_mouse = MOUSE_ALL;
 static int opt_repeat_delay = 0;
 static int opt_repeat_rate = 0;
 static const char *opt_device = NULL;
@@ -87,7 +88,7 @@ enum {
 	OPT_REPEAT_RATE,
 };
 
-static const char short_opts[] = "d:fg:hlm:Mp:rs:cv";
+static const char short_opts[] = "d:fg:hlm:Mp:rs:c::v";
 
 static const struct option long_opts[] = {
 	{ "device",         required_argument, NULL, 'd' },
@@ -102,7 +103,7 @@ static const struct option long_opts[] = {
 	{ "repeat-delay",   required_argument, NULL, OPT_REPEAT_DELAY },
 	{ "repeat-rate",    required_argument, NULL, OPT_REPEAT_RATE },
 	{ "stereo-width",   required_argument, NULL, 's' },
-	{ "no-click",       no_argument,       NULL, 'c' },
+	{ "no-click",       optional_argument, NULL, 'c' },
 	{ "verbose",        no_argument,       NULL, 'v' },
         { 0, 0, 0, 0 }
 };
@@ -155,7 +156,8 @@ int main(int argc, char **argv)
 				opt_stereo_width = atoi(optarg);
 				break;
 			case 'c':
-				opt_no_click++;
+				opt_mouse &= ~(optarg ? parse_mouse(optarg)
+				                      : MOUSE_ALL);
 				break;
 			case 'v':
 				opt_verbose++;
@@ -237,7 +239,9 @@ static void usage(char *exe)
 		"  -g, --gain=GAIN           set playback gain [0..100]\n"
 		"  -m, --mute-keycode=CODE   use CODE as mute key (default 0x46 for scroll lock)\n"
 		"  -M, --mute                start the program muted\n"
-		"  -c, --no-click            don't play a sound on mouse click\n"
+		"  -c, --no-click[=LIST]     don't play a sound on mouse click; LIST\n"
+		"                            narrows it to some of left, middle, right,\n"
+		"                            side, extra, wheel, hwheel, all, none\n"
 		"  -h, --help                show help\n"
 		"  -l, --list-devices        list available OpenAL audio devices\n"
 		"  -p, --audio-path=PATH     load .wav files from directory PATH\n"
@@ -272,6 +276,84 @@ static void list_devices(void)
  * Should a key that the user holds down make a sound each time it auto
  * repeats?  The backends ask, as each has to recognise a repeat its own way.
  */
+
+/*
+ * The events --no-click can name.  "all" and "none" are the two ends of the
+ * list rather than special cases in the parser, "all" being what a bare
+ * --no-click means and "none" the option not being given at all.
+ */
+
+static const struct {
+	const char *name;
+	int bits;
+} mouse_events[] = {
+	{ "left",   MOUSE_LEFT   },
+	{ "middle", MOUSE_MIDDLE },
+	{ "right",  MOUSE_RIGHT  },
+	{ "side",   MOUSE_SIDE   },
+	{ "extra",  MOUSE_EXTRA  },
+	{ "wheel",  MOUSE_WHEEL  },
+	{ "hwheel", MOUSE_HWHEEL },
+	{ "all",    MOUSE_ALL    },
+	{ "none",   0            },
+};
+
+#define N_MOUSE_EVENTS (sizeof(mouse_events) / sizeof(mouse_events[0]))
+
+
+/* The argument of --no-click: the events to fall silent on. */
+
+static int parse_mouse(const char *arg)
+{
+	char *spec, *tok, *save = NULL;
+	int bits = 0;
+	size_t i;
+
+	spec = strdup(arg);
+	if(spec == NULL) {
+		fprintf(stderr, "Out of memory\n");
+		exit(1);
+	}
+
+	for(tok = strtok_r(spec, ",", &save); tok; tok = strtok_r(NULL, ",", &save)) {
+
+		for(i = 0; i < N_MOUSE_EVENTS; i++) {
+			if(strcmp(tok, mouse_events[i].name) == 0) {
+				break;
+			}
+		}
+
+		if(i == N_MOUSE_EVENTS) {
+			fprintf(stderr, "Unknown mouse event \"%s\"\n", tok);
+			fprintf(stderr, "Expected a comma separated list of:");
+			for(i = 0; i < N_MOUSE_EVENTS; i++) {
+				fprintf(stderr, " %s", mouse_events[i].name);
+			}
+			fprintf(stderr, "\n");
+			exit(1);
+		}
+
+		bits |= mouse_events[i].bits;
+	}
+
+	free(spec);
+
+	return bits;
+}
+
+
+/*
+ * Is this one of the mouse events the user left enabled?  Asked by both
+ * backends, which name the same events by different numbers.  Doing it here
+ * rather than in play() is what lets --no-click take a list: by the time a
+ * sound reaches play() every mouse event looks alike.
+ */
+
+int mouse_enabled(int which)
+{
+	return (opt_mouse & which) != 0;
+}
+
 
 int repeat_enabled(void)
 {
@@ -374,8 +456,6 @@ int play(int code, int press)
 	ALCenum error;
 
 	printd("scancode %d/0x%x", code, code);
-
-	if (code == 0xff && opt_no_click) return 0;
 
 	/* Check for mute sequence: ScrollLock down+up+down */
 
