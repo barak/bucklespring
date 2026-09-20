@@ -1,4 +1,4 @@
-bucklespring (1.5.1-3) UNRELEASED; urgency=medium
+bucklespring (1.5.1-3) unstable; urgency=medium
 
   * Note in debian/copyright the two sources scan-mac.c is derived from,
     VirtualBox's DarwinKeyboard.cpp and a blog post by Daniel Beard, as
@@ -71,6 +71,7 @@ bucklespring (1.5.1-3) UNRELEASED; urgency=medium
     option that would not parse, as the GNU coding standards have it; --
     version already did.  Both being on stdout, help2man no longer needs
     --no-discard-stderr.
+  * German debconf translation (closes: #1148564)
 
  -- Barak A. Pearlmutter <bap@debian.org>  Mon, 07 Sep 2026 12:33:07 +0100
 

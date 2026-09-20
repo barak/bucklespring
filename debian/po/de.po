@@ -1,0 +1,75 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the bucklespring package.
+# Helge Kreutzmann <debian@helgefjell.de>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: bucklespring 1.5.1-2\n"
+"Report-Msgid-Bugs-To: bucklespring@packages.debian.org\n"
+"POT-Creation-Date: 2026-09-02 09:18+0100\n"
+"PO-Revision-Date: 2026-09-20 22:47+0200\n"
+"Last-Translator: Helge Kreutzmann <debian@helgefjell.de>\n"
+"Language-Team: German <debian-l10n-german@lists.debian.org>\n"
+"Language: de\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#. Type: boolean
+#. Description
+#: ../bucklespring-libinput.templates:1001
+msgid "Let the user at the local seat read the input devices?"
+msgstr "Soll der Benutzer mit dem lokalen Sitz die Eingabegeräte lesen können?"
+
+#. Type: boolean
+#. Description
+#: ../bucklespring-libinput.templates:1001
+msgid ""
+"buckle-libinput reads key and mouse events straight from /dev/input, which "
+"ordinarily only root and members of the \"input\" group may do. This package "
+"ships a udev rule that hands the keyboard and pointer devices to whoever is "
+"physically logged in at the local seat, as an ACL which systemd-logind adds "
+"at login and takes away again at logout. The rule stays inert unless it is "
+"enabled here."
+msgstr ""
+"buckle-libinput liest Tasten- und Mausereignisse direkt aus /dev/input, was "
+"normalerweise nur Root und Mitglieder der Gruppe »input« machen dürfen. "
+"Diese Paket liefert eine Udev-Regel aus, die das Tastatur- und den "
+"Zeigergerät an denjenigen übergeben, der am lokalen Sitz angemeldet ist. "
+"Dazu verwendet es eine ACL, die Systemd-logind beim Anmelden hinzufügt und "
+"beim Abmelden wieder entfernt. Die Regel bleibt inaktiv, außer sie wird hier "
+"aktiviert."
+
+#. Type: boolean
+#. Description
+#: ../bucklespring-libinput.templates:1001
+msgid ""
+"Enabling it has a real cost: every process that user runs can then read "
+"every keystroke on the machine, including passwords typed into other "
+"applications. Bucklespring is a toy that makes a keyboard sound like an IBM "
+"Model M, so only agree if you are content to pay that price for the noise."
+msgstr ""
+"Aktivierung produziert echte Kosten: Jeder Prozess, den der Benutzer "
+"ausführt, kann dann jeden Tastaturanschlag auf der Maschine lesen, "
+"einschließlich Passwörter, die in andere Anwendungen eingegeben werden. "
+"Bucklespring ist ein Spielzeug, wodurch sich eine Tastatur wie ein IBM Model "
+"M anhört. Stimmen Sie daher nur zu, wenn Sie bereit sind, den Preis für den "
+"Lärm zu bezahlen."
+
+#. Type: boolean
+#. Description
+#: ../bucklespring-libinput.templates:1001
+msgid ""
+"The answer is stored as the presence or absence of the file /etc/"
+"bucklespring/uaccess, which is rewritten from this answer every time the "
+"package is configured. Create or delete that file by hand for a temporary "
+"change, and run \"udevadm trigger --subsystem-match=input --action=change\" "
+"afterwards so that it reaches devices which are already plugged in."
+msgstr ""
+"Die Antwort wird als Existenz oder Abwesenheit der Datei /etc/bucklespring/"
+"uaccess gespeichert, die aus dieser Antwort jedesmal neu geschrieben wird, "
+"wenn das Paket rekonfiguriert wird. Erstellen oder löschen Sie die Datei von "
+"Hand für eine temporäre Änderung und führen Sie danach »udevadm trigger --"
+"subsystem-match=input --action=change« aus, so dass sie die bereits "
+"eingesteckten Geräte erreicht."

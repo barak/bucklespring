@@ -14,9 +14,11 @@ Programs that document themselves with help2man no longer need to be run with
 --no-discard-stderr once both do.
 Forwarded: no
 ---
- main.c |   19 ++++++++++++++-----
+ main.c | 19 ++++++++++++++-----
  1 file changed, 14 insertions(+), 5 deletions(-)
 
+diff --git a/main.c b/main.c
+index 5ecfcc4..03bf721 100644
 --- a/main.c
 +++ b/main.c
 @@ -56,7 +56,7 @@
@@ -28,7 +30,7 @@ Forwarded: no
  static void version(char *exe);
  static void list_devices(void);
  static int parse_mouse(const char *arg);
-@@ -155,7 +155,7 @@
+@@ -155,7 +155,7 @@ int main(int argc, char **argv)
  				opt_gain = atoi(optarg);
  				break;
  			case 'h':
@@ -37,7 +39,7 @@ Forwarded: no
  				return 0;
  			case 'l':
  				list_devices();
-@@ -192,7 +192,7 @@
+@@ -192,7 +192,7 @@ int main(int argc, char **argv)
  				exit(0);
  				break;
  			default:
@@ -46,7 +48,7 @@ Forwarded: no
  				return 1;
  				break;
  		}
-@@ -255,9 +255,18 @@
+@@ -255,9 +255,18 @@ out:
  }
  
  
