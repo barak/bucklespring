@@ -33,6 +33,7 @@
 #include <stdbool.h>
 #include <getopt.h>
 #include <time.h>
+#include <pthread.h>
 
 #ifdef __APPLE__
 #include <OpenAL/al.h>
@@ -60,6 +61,11 @@ static void usage(char *exe, int status);
 static void version(char *exe);
 static void list_devices(void);
 static int parse_mouse(const char *arg);
+static void audio_forget_sources(void);
+static ALCenum device_specifier(void);
+static const char *default_device_name(void);
+static int audio_open(const char *name);
+static void audio_close(void);
 static double find_key_loc(int code);
 
 
@@ -99,17 +105,34 @@ static int opt_fallback_sound = 0;
 static int opt_mute_keycode = DEFAULT_MUTE_KEYCODE;
 static int opt_no_repeat = 0;
 static int opt_mouse = MOUSE_ALL;
+static int opt_no_tray = 0;
 static int opt_repeat_delay = 0;
 static int opt_repeat_rate = 0;
 static const char *opt_device = NULL;
 static const char *opt_path_audio = PATH_AUDIO;
 static int muted = 0;
 
+/*
+ * The samples, the sources playing them and the device they go to.  These used
+ * to be locals of play() and of main(), which was fine while the program was
+ * one thread deep in the key event loop.  The tray, when there is one, runs
+ * the GTK loop on the main thread and changes the gain, the mute and even the
+ * output device from there, so the lot moves out here behind one lock.  Every
+ * al* call in this file is made with it held.
+ */
+
+static pthread_mutex_t audio_lock = PTHREAD_MUTEX_INITIALIZER;
+static ALCdevice *device = NULL;
+static ALCcontext *context = NULL;
+static ALuint buf[512];
+static ALuint src[512];
+
 
 /* Options with no short form of their own start past the character codes. */
 enum {
 	OPT_REPEAT_DELAY = 256,
 	OPT_REPEAT_RATE,
+	OPT_NO_TRAY,
 };
 
 static const char short_opts[] = "d:fg:hlm:Mp:rs:c::vV";
@@ -127,12 +150,23 @@ static const struct option long_opts[] = {
 	{ "repeat-delay",   required_argument, NULL, OPT_REPEAT_DELAY },
 	{ "repeat-rate",    required_argument, NULL, OPT_REPEAT_RATE },
 	{ "stereo-width",   required_argument, NULL, 's' },
+	{ "no-tray",        no_argument,       NULL, OPT_NO_TRAY },
 	{ "no-click",       optional_argument, NULL, 'c' },
 	{ "verbose",        no_argument,       NULL, 'v' },
 	{ "version",        no_argument,       NULL, 'V' },
         { 0, 0, 0, 0 }
 };
 
+
+
+#ifdef HAVE_TRAY
+static void *scan_thread(void *arg)
+{
+	(void)arg;
+	scan(opt_verbose);
+	return NULL;
+}
+#endif
 
 
 int main(int argc, char **argv)
@@ -171,6 +205,9 @@ int main(int argc, char **argv)
 			case 'r':
 				opt_no_repeat = 1;
 				break;
+			case OPT_NO_TRAY:
+				opt_no_tray = 1;
+				break;
 			case OPT_REPEAT_DELAY:
 				opt_repeat_delay = atoi(optarg);
 				break;
@@ -204,34 +241,19 @@ int main(int argc, char **argv)
 
 	/* Create openal context */
 
-	ALCdevice *device = NULL;
-	ALCcontext *context = NULL;
-	ALfloat listenerOri[] = { 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f };
-	ALCenum error;
-
 	if (!opt_device) {
-		opt_device = alcGetString(NULL, ALC_DEFAULT_DEVICE_SPECIFIER);
+		opt_device = default_device_name();
 	}
 
 	printd("Opening OpenAL audio device \"%s\"", opt_device);
 
-	device = alcOpenDevice(opt_device);
-	if (!device) {
-		fprintf(stderr, "unable to open default device\n");
-		rv = EXIT_FAILURE;
-		goto out;
+	pthread_mutex_lock(&audio_lock);
+	if(audio_open(opt_device) < 0) {
+		pthread_mutex_unlock(&audio_lock);
+		fprintf(stderr, "unable to open audio device \"%s\"\n", opt_device);
+		return EXIT_FAILURE;
 	}
-
-	context = alcCreateContext(device, NULL);
-	if (!alcMakeContextCurrent(context)) {
-		fprintf(stderr, "failed to make default context\n");
-		return -1;
-	}
-	TEST_ERROR("make default context");
-
-	alListener3f(AL_POSITION, 0, 0, 0);
-	alListener3f(AL_VELOCITY, 0, 0, 0);
-	alListenerfv(AL_ORIENTATION, listenerOri);
+	pthread_mutex_unlock(&audio_lock);
 
 	/* Path to data files can also be specified by environment, this is
 	 * used by the snap package */
@@ -243,13 +265,32 @@ int main(int argc, char **argv)
 
 	printd("Using wav dir: \"%s\"\n", opt_path_audio);
 
-	scan(opt_verbose);
+#ifdef HAVE_TRAY
+	/*
+	 * GTK wants the main thread for its loop, and the key event loop never
+	 * returns either way, so with a tray the two swap places.  Without one
+	 * compiled in, or with no display to put it on, nothing changes.
+	 */
 
-out:
-	device = alcGetContextsDevice(context);
-	alcMakeContextCurrent(NULL);
-	if(context) alcDestroyContext(context);
-	if(device) alcCloseDevice(device);
+	if(!opt_no_tray && tray_init()) {
+		pthread_t scanner;
+
+		if(pthread_create(&scanner, NULL, scan_thread, NULL) == 0) {
+			tray_run();
+		} else {
+			fprintf(stderr, "Cannot start the key event thread\n");
+			rv = EXIT_FAILURE;
+		}
+	} else
+#endif
+	{
+		scan(opt_verbose);
+	}
+
+	pthread_mutex_lock(&audio_lock);
+	audio_forget_sources();
+	audio_close();
+	pthread_mutex_unlock(&audio_lock);
 
 	return rv;
 }
@@ -288,6 +329,7 @@ static void usage(char *exe, int status)
 		"                            what the compositor or the kernel says\n"
 		"      --repeat-rate=HZ      make HZ repeats per second, likewise\n"
 		"  -s, --stereo-width=WIDTH  set stereo width [0..100]\n"
+		"      --no-tray             do not put an icon in the system tray\n"
 		"  -v, --verbose             increase verbosity / debugging\n"
 		"  -V, --version             show version and exit\n",
 		exe
@@ -322,20 +364,149 @@ static void version(char *exe)
 }
 
 
+/*
+ * ALC_DEVICE_SPECIFIER is not the list of sound cards: with OpenAL Soft it is
+ * one entry, "OpenAL Soft", standing for whatever that library decides to
+ * use.  The real outputs are behind ALC_ENUMERATE_ALL_EXT, so ask for those
+ * where it is present and keep the old token only as a fallback.
+ */
+
+static ALCenum device_specifier(void)
+{
+	return alcIsExtensionPresent(NULL, "ALC_ENUMERATE_ALL_EXT")
+		? ALC_ALL_DEVICES_SPECIFIER
+		: ALC_DEVICE_SPECIFIER;
+}
+
+
+static const char *default_device_name(void)
+{
+	return alcGetString(NULL,
+		alcIsExtensionPresent(NULL, "ALC_ENUMERATE_ALL_EXT")
+			? ALC_DEFAULT_ALL_DEVICES_SPECIFIER
+			: ALC_DEFAULT_DEVICE_SPECIFIER);
+}
+
+
+/*
+ * The ALC device list is one run of NUL terminated names closed by an empty
+ * one.  Unpack it into something a caller can walk without knowing that.
+ */
+
+char **buckle_audio_devices(void)
+{
+	const ALCchar *s = alcGetString(NULL, device_specifier());
+	const ALCchar *p;
+	size_t n = 0, i = 0;
+	char **out;
+
+	for(p = s; p != NULL && *p != '\0'; p += strlen(p) + 1) {
+		n++;
+	}
+
+	out = calloc(n + 1, sizeof *out);
+	if(out == NULL) {
+		return NULL;
+	}
+
+	for(p = s; p != NULL && *p != '\0'; p += strlen(p) + 1) {
+		out[i] = strdup(p);
+		if(out[i] == NULL) {
+			break;
+		}
+		i++;
+	}
+
+	return out;
+}
+
+
+void buckle_audio_devices_free(char **list)
+{
+	size_t i;
+
+	if(list == NULL) {
+		return;
+	}
+	for(i = 0; list[i] != NULL; i++) {
+		free(list[i]);
+	}
+	free(list);
+}
+
+
+/* All three expect audio_lock to be held. */
+
+static void audio_forget_sources(void)
+{
+	size_t i;
+
+	for(i = 0; i < sizeof src / sizeof *src; i++) {
+		if(src[i] != 0 && src[i] != SRC_INVALID) {
+			alDeleteSources(1, &src[i]);
+		}
+		if(buf[i] != 0) {
+			alDeleteBuffers(1, &buf[i]);
+		}
+		src[i] = 0;
+		buf[i] = 0;
+	}
+}
+
+
+static int audio_open(const char *name)
+{
+	ALfloat ori[] = { 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f };
+
+	device = alcOpenDevice(name);
+	if(device == NULL) {
+		return -1;
+	}
+
+	context = alcCreateContext(device, NULL);
+	if(context == NULL || !alcMakeContextCurrent(context)) {
+		if(context != NULL) {
+			alcDestroyContext(context);
+		}
+		alcCloseDevice(device);
+		device = NULL;
+		context = NULL;
+		return -1;
+	}
+
+	alListener3f(AL_POSITION, 0, 0, 0);
+	alListener3f(AL_VELOCITY, 0, 0, 0);
+	alListenerfv(AL_ORIENTATION, ori);
+
+	return 0;
+}
+
+
+static void audio_close(void)
+{
+	alcMakeContextCurrent(NULL);
+	if(context != NULL) {
+		alcDestroyContext(context);
+		context = NULL;
+	}
+	if(device != NULL) {
+		alcCloseDevice(device);
+		device = NULL;
+	}
+}
+
+
 static void list_devices(void)
 {
-	const ALCchar *devices = alcGetString(NULL, ALC_DEVICE_SPECIFIER);
-	const ALCchar *device = devices, *next = devices + 1;
-	size_t len = 0;
+	char **list = buckle_audio_devices();
+	size_t i;
 
 	printf("Available audio devices:");
-	while (device && *device != '\0' && next && *next != '\0') {
-		fprintf(stdout, " \"%s\"", device);
-		len = strlen(device);
-		device += (len + 1);
-		next += (len + 2);
+	for(i = 0; list != NULL && list[i] != NULL; i++) {
+		printf(" \"%s\"", list[i]);
 	}
 	printf("\n");
+	buckle_audio_devices_free(list);
 }
 
 
@@ -419,6 +590,140 @@ static int parse_mouse(const char *arg)
 int mouse_enabled(int which)
 {
 	return (opt_mouse & which) != 0;
+}
+
+
+/*
+ * What the tray can ask for and change.  Each takes the audio lock, so these
+ * are safe to call from the GTK thread while the key event loop is playing.
+ */
+
+int buckle_muted(void)
+{
+	int m;
+
+	pthread_mutex_lock(&audio_lock);
+	m = muted;
+	pthread_mutex_unlock(&audio_lock);
+
+	return m;
+}
+
+
+void buckle_set_muted(int on)
+{
+	pthread_mutex_lock(&audio_lock);
+	muted = on ? 1 : 0;
+	pthread_mutex_unlock(&audio_lock);
+}
+
+
+int buckle_gain(void)
+{
+	int g;
+
+	pthread_mutex_lock(&audio_lock);
+	g = opt_gain;
+	pthread_mutex_unlock(&audio_lock);
+
+	return g;
+}
+
+
+/* The gain is set on a source when it is first made, so the sources that
+ * already exist have to be told again. */
+
+void buckle_set_gain(int gain)
+{
+	size_t i;
+
+	if(gain < 0) { gain = 0; }
+	if(gain > 100) { gain = 100; }
+
+	pthread_mutex_lock(&audio_lock);
+	opt_gain = gain;
+	for(i = 0; i < sizeof src / sizeof *src; i++) {
+		if(src[i] != 0 && src[i] != SRC_INVALID) {
+			alSourcef(src[i], AL_GAIN, opt_gain / 100.0);
+		}
+	}
+	pthread_mutex_unlock(&audio_lock);
+}
+
+
+/*
+ * The name of the device that is open, which is not always the name it was
+ * opened by: asking for the default gets a real output back.  Copied into a
+ * buffer because the string belongs to the device and would dangle the moment
+ * one is closed; only the tray calls this, and only from the GTK thread.
+ */
+
+const char *buckle_audio_device(void)
+{
+	static char name[256];
+	const ALCchar *s = NULL;
+
+	pthread_mutex_lock(&audio_lock);
+	if(device != NULL) {
+		s = alcGetString(device, device_specifier());
+	}
+	if(s == NULL) {
+		s = opt_device;
+	}
+	snprintf(name, sizeof name, "%s", s != NULL ? s : "");
+	pthread_mutex_unlock(&audio_lock);
+
+	return name;
+}
+
+
+/*
+ * Move to another output device.  The samples are bound to sources which
+ * belong to the old context, so they go with it and play() loads them again
+ * on demand.  On failure the old device is reopened, as having no device at
+ * all would leave the program running and silent with no way back.
+ */
+
+int buckle_set_audio_device(const char *name)
+{
+	const char *old = opt_device;
+	int rv = 0;
+
+	pthread_mutex_lock(&audio_lock);
+
+	audio_forget_sources();
+	audio_close();
+
+	if(audio_open(name) == 0) {
+		opt_device = name;
+	} else if(audio_open(old) == 0) {
+		rv = -1;
+	} else {
+		fprintf(stderr, "Lost the audio device \"%s\" and could not get "
+				"\"%s\" back\n", name, old);
+		rv = -1;
+	}
+
+	pthread_mutex_unlock(&audio_lock);
+
+	return rv;
+}
+
+
+int buckle_mute_keycode(void)
+{
+	return opt_mute_keycode;
+}
+
+
+void buckle_quit(void)
+{
+	pthread_mutex_lock(&audio_lock);
+	audio_forget_sources();
+	audio_close();
+	pthread_mutex_unlock(&audio_lock);
+
+	exit(EXIT_SUCCESS);
 }
 
 
@@ -524,14 +829,13 @@ int play(int code, int press)
 
 	printd("scancode %d/0x%x", code, code);
 
+	pthread_mutex_lock(&audio_lock);
+
 	/* Check for mute sequence: ScrollLock down+up+down */
 
 	if (press) {
 		handle_mute_key(code == opt_mute_keycode);
 	}
-
-	static ALuint buf[512] = { 0 };
-	static ALuint src[512] = { 0 };
 
 	int idx = code + press * 256;
 
@@ -554,6 +858,7 @@ int play(int code, int press)
 
 			if(buf[idx] == 0) {
 				src[idx] = SRC_INVALID;
+				pthread_mutex_unlock(&audio_lock);
 				return -1;
 			}
 		}
@@ -577,6 +882,8 @@ int play(int code, int press)
 			alSourcePlay(src[idx]);
 		TEST_ERROR("source playing");
 	}
+
+	pthread_mutex_unlock(&audio_lock);
 
 	return 0;
 }

@@ -12,26 +12,43 @@ CLEANFILES =
 
 # One program per source of key events.  main.c is shared, so per target flags
 # are what keeps them apart; automake gives each its own object files.
+# The tray is the same for every flavour, so it joins each of them rather than
+# being a flavour of its own.
+if HAVE_TRAY
+tray_cflags = $(TRAY_CFLAGS) $(PTHREAD_CFLAGS)
+tray_libs = $(TRAY_LIBS)
+else
+tray_cflags =
+tray_libs =
+endif
+
 buckle_x11_SOURCES = main.c buckle.h scan-x11.c
 buckle_x11_CPPFLAGS = $(buckle_cppflags)
-buckle_x11_CFLAGS = $(AM_CFLAGS) $(AUDIO_CFLAGS) $(X11_CFLAGS)
-buckle_x11_LDADD = $(AUDIO_LIBS) $(X11_LIBS)
+buckle_x11_CFLAGS = $(AM_CFLAGS) $(AUDIO_CFLAGS) $(X11_CFLAGS) $(tray_cflags)
+buckle_x11_LDADD = $(AUDIO_LIBS) $(X11_LIBS) $(tray_libs)
 
 buckle_libinput_SOURCES = main.c buckle.h scan-libinput.c wl-repeat.c
 buckle_libinput_CPPFLAGS = $(buckle_cppflags)
-buckle_libinput_CFLAGS = $(AM_CFLAGS) $(AUDIO_CFLAGS) $(LIBINPUT_CFLAGS)
-buckle_libinput_LDADD = $(AUDIO_LIBS) $(LIBINPUT_LIBS)
+buckle_libinput_CFLAGS = $(AM_CFLAGS) $(AUDIO_CFLAGS) $(LIBINPUT_CFLAGS) $(tray_cflags)
+buckle_libinput_LDADD = $(AUDIO_LIBS) $(LIBINPUT_LIBS) $(tray_libs)
 
 buckle_mac_SOURCES = main.c buckle.h scan-mac.c
 buckle_mac_CPPFLAGS = $(buckle_cppflags)
-buckle_mac_CFLAGS = $(AM_CFLAGS) $(AUDIO_CFLAGS)
-buckle_mac_LDADD = $(AUDIO_LIBS) $(MAC_LIBS)
+buckle_mac_CFLAGS = $(AM_CFLAGS) $(AUDIO_CFLAGS) $(tray_cflags)
+buckle_mac_LDADD = $(AUDIO_LIBS) $(MAC_LIBS) $(tray_libs)
 
 buckle_windows_SOURCES = main.c buckle.h scan-windows.c
 buckle_windows_CPPFLAGS = $(buckle_cppflags)
-buckle_windows_CFLAGS = $(AM_CFLAGS) $(AUDIO_CFLAGS)
+buckle_windows_CFLAGS = $(AM_CFLAGS) $(AUDIO_CFLAGS) $(tray_cflags)
 buckle_windows_LDFLAGS = $(WINDOWS_LDFLAGS)
-buckle_windows_LDADD = $(AUDIO_LIBS)
+buckle_windows_LDADD = $(AUDIO_LIBS) $(tray_libs)
+
+if HAVE_TRAY
+buckle_x11_SOURCES += tray.c
+buckle_libinput_SOURCES += tray.c
+buckle_mac_SOURCES += tray.c
+buckle_windows_SOURCES += tray.c
+endif
 
 desktopdir = $(datadir)/applications
 dist_desktop_DATA =

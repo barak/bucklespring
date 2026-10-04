@@ -18,7 +18,8 @@ palette of pure nostalgic bliss.
 
 To temporarily silence bucklespring, for example to enter secrets, press
 ScrollLock twice (but be aware that those ScrollLock events _are_ delivered to
-the application); same to unmute. The keycode for muting can be changed with
+the application); same to unmute.  There is a Pause entry on the tray menu
+which does the same thing. The keycode for muting can be changed with
 the `-m` option. Use keycode 0 to disable the mute function.
 
 Installation
@@ -65,27 +66,31 @@ libraries and header files are installed, then simply run `make`:
 
 Every flavour needs OpenAL and alure.  `buckle-x11` needs libX11 and libXtst
 on top of that, and `buckle-libinput` needs libinput, libudev and
-libwayland-client.  Building from a git checkout rather than a release tarball
-also needs autoconf, automake and pkg-config.
+libwayland-client.  The system tray icon needs GTK 3 and
+libayatana-appindicator; it is left out when they are missing.  Building from
+a git checkout rather than a release tarball also needs autoconf, automake and
+pkg-config.
 
 #### Dependencies on Debian
 ```
 $ sudo apt-get install build-essential autoconf automake pkg-config \
     libopenal-dev libalure-dev libxtst-dev \
-    libinput-dev libudev-dev libwayland-dev
+    libinput-dev libudev-dev libwayland-dev \
+    libgtk-3-dev libayatana-appindicator3-dev
 ```
 
 #### Dependencies on Arch Linux
 ```
 $ sudo pacman -S base-devel autoconf automake pkgconf openal alure libxtst \
-    libinput systemd-libs wayland
+    libinput systemd-libs wayland gtk3 libayatana-appindicator
 ```
 
 #### Dependencies on Fedora Linux
 ```
 $ sudo dnf install gcc autoconf automake pkgconf openal-soft-devel \
     alure-devel libX11-devel libXtst-devel \
-    libinput-devel systemd-devel wayland-devel
+    libinput-devel systemd-devel wayland-devel \
+    gtk3-devel libayatana-appindicator-gtk3-devel
 ```
 
 #### Building
@@ -109,7 +114,8 @@ one whose dependencies it finds, so the command above generally produces two:
 
 Pass `--disable-libinput` or `--disable-x11` to build just the one, and
 `--enable-libinput` to insist on it rather than let a missing library quietly
-turn it off.  `./configure --help` lists the rest.
+turn it off.  The same goes for `--enable-tray` and `--disable-tray`.
+`./configure --help` lists the rest.
 
 #### Reading the input devices
 
@@ -127,6 +133,28 @@ $ sudo udevadm trigger --subsystem-match=input --action=change
 Read the comments in the rule before you do: that access lets any process of
 yours read every keystroke on the machine, passwords typed into other
 programs included.  Delete the flag file and trigger again to take it back.
+
+#### The tray icon
+
+Where GTK 3 and libayatana-appindicator were found at build time, buckle puts
+an icon in the system tray with a menu for the things worth reaching without a
+terminal: pause and resume, the volume, which audio device to play to, and
+quit.  `--no-tray` leaves it out for one run.
+
+The volume is a submenu of levels, any of which is one click away, with `+`
+and `-` at the two ends for a nudge.  Rolling the mouse wheel over the icon
+itself also works, and does not involve opening the menu at all.  A slider
+would be nicer, but a tray menu travels over dbusmenu, which carries labels
+and check marks rather than widgets, so there is no slider to be had; nor can
+the program keep the menu open after a click, which is the panel's decision.
+
+The icon is a StatusNotifierItem.  KDE Plasma shows those as they are; GNOME
+Shell needs an extension, `gnome-shell-extension-appindicator` on Debian.
+Where nothing is listening the icon simply does not appear, and buckle carries
+on regardless, as it does on a console where there is no display at all.
+
+Pausing from the menu and pausing from the keyboard are the same switch, so
+the menu follows along when you use the key.
 
 #### Starting it automatically
 
@@ -201,6 +229,7 @@ Options:
                             what the compositor or the kernel says
       --repeat-rate=HZ      make HZ repeats per second, likewise
   -s, --stereo-width=WIDTH  set stereo width [0..100]
+      --no-tray             do not put an icon in the system tray
   -v, --verbose             increase verbosity / debugging
   -V, --version             show version and exit
 ````

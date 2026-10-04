@@ -79,6 +79,41 @@ AS_IF([test "x$enable_windows" = xyes],
   [WINDOWS_LDFLAGS="-mwindows -static-libgcc -static-libstdc++"])
 AC_SUBST([WINDOWS_LDFLAGS])
 
+dnl An icon in the system tray, with a menu for pausing, the volume and the
+dnl output device.  It needs GTK and libayatana-appindicator, which is a good
+dnl deal more than the rest of the program does, so it is built when they are
+dnl there and quietly left out when they are not.
+AC_ARG_ENABLE([tray],
+  [AS_HELP_STRING([--enable-tray],[build the system tray icon @<:@auto@:>@])],
+  [], [enable_tray=auto])
+AS_IF([test "x$enable_tray" != xno],
+  [PKG_CHECK_MODULES([TRAY],[gtk+-3.0 ayatana-appindicator3-0.1],
+     [enable_tray=yes
+      AC_DEFINE([HAVE_TRAY],[1],[Define to build the system tray icon.])],
+     [AS_IF([test "x$enable_tray" = xyes],
+            [AC_MSG_ERROR([--enable-tray given but: $TRAY_PKG_ERRORS])],
+            [enable_tray=no])])])
+AM_CONDITIONAL([HAVE_TRAY],[test "x$enable_tray" = xyes])
+
+dnl The tray runs the GTK loop on the main thread and the key event loop on
+dnl one of its own, so the program needs threads once the tray is in it.
+dnl -pthread covers every compiler that can reach GTK in the first place,
+dnl which is why this is not AX_PTHREAD and no autoconf-archive is needed.
+AS_IF([test "x$enable_tray" = xyes], [
+  buckle_save_CFLAGS=$CFLAGS
+  CFLAGS="$CFLAGS -pthread"
+  AC_MSG_CHECKING([whether $CC accepts -pthread])
+  AC_LINK_IFELSE(
+    [AC_LANG_PROGRAM([[#include <pthread.h>]],
+       [[pthread_t t; pthread_create(&t, 0, 0, 0);]])],
+    [AC_MSG_RESULT([yes])
+     PTHREAD_CFLAGS=-pthread],
+    [AC_MSG_RESULT([no])
+     AC_MSG_ERROR([the system tray needs POSIX threads])])
+  CFLAGS=$buckle_save_CFLAGS
+])
+AC_SUBST([PTHREAD_CFLAGS])
+
 AS_IF([test "x$enable_x11" = xno && test "x$enable_libinput" = xno &&
        test "x$enable_mac" = xno && test "x$enable_windows" = xno],
   [AC_MSG_ERROR([no backend enabled, so there would be nothing to build])])
@@ -122,6 +157,7 @@ AC_MSG_NOTICE([
   buckle-libinput ... $enable_libinput
   buckle-mac ........ $enable_mac
   buckle-windows .... $enable_windows
+  system tray ....... $enable_tray
   help2man .......... $HELP2MAN (only for "make update-man")
   systemd units ..... $with_systemduserunitdir
   udev rules ........ $with_udevrulesdir

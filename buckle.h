@@ -22,6 +22,24 @@ int play(int code, int press);
 			 MOUSE_WHEEL | MOUSE_HWHEEL)
 
 int mouse_enabled(int which);
+
+/* What the tray drives the program through; all of it is thread safe. */
+
+int buckle_muted(void);
+void buckle_set_muted(int on);
+int buckle_gain(void);
+void buckle_set_gain(int gain);
+int buckle_mute_keycode(void);
+const char *buckle_audio_device(void);
+int buckle_set_audio_device(const char *name);
+char **buckle_audio_devices(void);
+void buckle_audio_devices_free(char **list);
+void buckle_quit(void);
+
+/* tray.c, built only when configured with a system tray */
+
+int tray_init(void);
+void tray_run(void);
 int repeat_enabled(void);
 void repeat_override(int *delay_ms, int *period_ms);
 int scan(int verbose);

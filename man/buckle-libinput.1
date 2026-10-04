@@ -54,6 +54,19 @@ shipped udev rule grants together.
 .PP
 The X11 flavour is
 .BR buckle\-x11 (1).
+
+Where it was built with the system tray, and there is a tray to put it in, an
+icon appears there with a menu for pausing, the volume, the output device and
+quitting.  The volume is a submenu of levels with
+.B +
+and
+.B \-
+at the ends of it, and rolling the wheel over the icon changes it without
+opening the menu at all.
+.B \-\-no\-tray
+leaves it out.  The icon is a StatusNotifierItem, which KDE Plasma shows as it
+is and GNOME Shell shows through an extension; where nothing is listening
+there is simply no icon and nothing else changes.
 .SH OPTIONS
 .TP
 \fB\-d\fR, \fB\-\-device\fR=\fI\,DEVICE\/\fR
@@ -97,6 +110,9 @@ make HZ repeats per second, likewise
 .TP
 \fB\-s\fR, \fB\-\-stereo\-width\fR=\fI\,WIDTH\/\fR
 set stereo width [0..100]
+.TP
+\fB\-\-no\-tray\fR
+do not put an icon in the system tray
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase verbosity / debugging
