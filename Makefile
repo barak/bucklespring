@@ -1,7 +1,7 @@
 
 NAME   	:= buckle
 SRC 	:= main.c
-VERSION	:= 1.5.1
+VERSION	:= 1.5.2~dev
 ifeq ($(OS),Windows_NT)
 CC := i686-w64-mingw32-gcc
 endif
