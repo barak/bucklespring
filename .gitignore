@@ -15,9 +15,10 @@ rec
 /config.status
 /configure
 /configure~
-/m4/
 /Makefile
 /Makefile.in
 /stamp-h1
 *.dirstamp
 .deps/
+/systemd/*.service
+/udev/*.rules

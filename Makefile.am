@@ -1,37 +1,134 @@
-ACLOCAL_AMFLAGS = -I m4
+AM_CFLAGS = -Wall
 
-bin_PROGRAMS = buckle
+# Every flavour looks for its samples in the same place.  This has to be built
+# here rather than in configure.ac: pkgdatadir is written in terms of
+# ${prefix}, which only make expands.
+buckle_cppflags = -DPATH_AUDIO='"$(wavdir)"'
 
-buckle_SOURCES = main.c buckle.h
+bin_PROGRAMS =
+dist_man1_MANS =
+dist_man8_MANS =
+CLEANFILES =
+
+# One program per source of key events.  main.c is shared, so per target flags
+# are what keeps them apart; automake gives each its own object files.
+buckle_x11_SOURCES = main.c buckle.h scan-x11.c
+buckle_x11_CPPFLAGS = $(buckle_cppflags)
+buckle_x11_CFLAGS = $(AM_CFLAGS) $(AUDIO_CFLAGS) $(X11_CFLAGS)
+buckle_x11_LDADD = $(AUDIO_LIBS) $(X11_LIBS)
+
+buckle_libinput_SOURCES = main.c buckle.h scan-libinput.c wl-repeat.c
+buckle_libinput_CPPFLAGS = $(buckle_cppflags)
+buckle_libinput_CFLAGS = $(AM_CFLAGS) $(AUDIO_CFLAGS) $(LIBINPUT_CFLAGS)
+buckle_libinput_LDADD = $(AUDIO_LIBS) $(LIBINPUT_LIBS)
+
+buckle_mac_SOURCES = main.c buckle.h scan-mac.c
+buckle_mac_CPPFLAGS = $(buckle_cppflags)
+buckle_mac_CFLAGS = $(AM_CFLAGS) $(AUDIO_CFLAGS)
+buckle_mac_LDADD = $(AUDIO_LIBS) $(MAC_LIBS)
+
+buckle_windows_SOURCES = main.c buckle.h scan-windows.c
+buckle_windows_CPPFLAGS = $(buckle_cppflags)
+buckle_windows_CFLAGS = $(AM_CFLAGS) $(AUDIO_CFLAGS)
+buckle_windows_LDFLAGS = $(WINDOWS_LDFLAGS)
+buckle_windows_LDADD = $(AUDIO_LIBS)
+
+desktopdir = $(datadir)/applications
+dist_desktop_DATA =
 
 if BACKEND_X11
-buckle_SOURCES += scan-x11.c
+bin_PROGRAMS += buckle-x11
+dist_man1_MANS += man/buckle-x11.1
+dist_desktop_DATA += buckle-x11.desktop
+endif
+
+if BACKEND_LIBINPUT
+bin_PROGRAMS += buckle-libinput
+dist_man1_MANS += man/buckle-libinput.1
+dist_desktop_DATA += buckle-libinput.desktop
+endif
+
+if BACKEND_MAC
+bin_PROGRAMS += buckle-mac
+endif
+
+if BACKEND_WINDOWS
+bin_PROGRAMS += buckle-windows
+endif
+
+# The systemd user units, and the manual pages that document them, follow the
+# programs they start.  The units are generated so that ExecStart names the
+# bindir this was configured for; the [@] keeps config.status from eating the
+# token on its way through Makefile.in.
+subst = $(SED) \
+	-e 's|@bindir[@]|$(bindir)|g' \
+	-e 's|@sysconfdir[@]|$(sysconfdir)|g'
+
+if INSTALL_SYSTEMD
+systemduserunit_DATA =
+if BACKEND_X11
+systemduserunit_DATA += systemd/buckle-x11.service
+dist_man8_MANS += man/buckle-x11.service.8
 endif
 if BACKEND_LIBINPUT
-buckle_SOURCES += scan-libinput.c wl-repeat.c
+systemduserunit_DATA += systemd/buckle-libinput.service
+dist_man8_MANS += man/buckle-libinput.service.8
 endif
-if BACKEND_MAC
-buckle_SOURCES += scan-mac.c
-endif
-if BACKEND_WINDOWS
-buckle_SOURCES += scan-windows.c
+CLEANFILES += $(systemduserunit_DATA)
 endif
 
-buckle_CPPFLAGS = -DPATH_AUDIO='"$(wavdir)"'
-buckle_CFLAGS = $(AUDIO_CFLAGS) $(BACKEND_CFLAGS)
-buckle_LDADD = $(AUDIO_LIBS) $(BACKEND_LIBS)
+systemd/buckle-x11.service: $(srcdir)/systemd/buckle-x11.service.in Makefile
+	$(AM_V_GEN)$(MKDIR_P) systemd && $(subst) < $< > $@
 
-AM_CFLAGS = -Wall
+systemd/buckle-libinput.service: $(srcdir)/systemd/buckle-libinput.service.in Makefile
+	$(AM_V_GEN)$(MKDIR_P) systemd && $(subst) < $< > $@
+
+# The uaccess rule is only of use to the flavour that reads the raw devices.
+# It does nothing until the administrator creates the flag file; read the
+# comments in it before arming it.
+if INSTALL_UDEV
+if BACKEND_LIBINPUT
+udevrules_DATA = udev/70-bucklespring-libinput.rules
+CLEANFILES += $(udevrules_DATA)
+endif
+endif
+
+udev/70-bucklespring-libinput.rules: $(srcdir)/udev/70-bucklespring-libinput.rules.in Makefile
+	$(AM_V_GEN)$(MKDIR_P) udev && $(subst) < $< > $@
+
+# The manual pages for the executables are generated from their own --help and
+# --version output, so an option added to the program turns up in its page
+# without anyone writing it down twice.  help2man has to run the program, which
+# a cross build cannot do, so the pages are kept in the tree and refreshed on
+# demand.  A page that changes here is telling you to commit it.
+H2M = $(HELP2MAN) --no-info \
+	--source="Bucklespring keyboard sound" --manual="User Commands"
+
+.PHONY: update-man
+update-man: $(bin_PROGRAMS)
+	@test "x$(HELP2MAN)" != xno || \
+	  { echo "update-man needs help2man; none was found by configure" >&2; \
+	    exit 1; }
+if BACKEND_X11
+	$(H2M) --include=$(srcdir)/man/buckle-x11.1.h2m \
+		--output=$(srcdir)/man/buckle-x11.1 ./buckle-x11$(EXEEXT)
+endif
+if BACKEND_LIBINPUT
+	$(H2M) --include=$(srcdir)/man/buckle-libinput.1.h2m \
+		--output=$(srcdir)/man/buckle-libinput.1 ./buckle-libinput$(EXEEXT)
+endif
 
 # The sample recorder, built only when asked for: make rec
 EXTRA_PROGRAMS = rec
 rec_SOURCES = rec.c
 
-desktopdir = $(datadir)/applications
-dist_desktop_DATA = buckle.desktop
 
-EXTRA_DIST = README.md LICENSE img/buckle.gif img/icon.png img/icon128.ico \
-	img/model-m.jpg mac/lib/pkgconfig/openal.pc
+EXTRA_DIST = README.md LICENSE \
+	img/buckle.gif img/icon.png img/icon128.ico img/model-m.jpg \
+	mac/lib/pkgconfig/openal.pc \
+	man/buckle-x11.1.h2m man/buckle-libinput.1.h2m \
+	systemd/buckle-x11.service.in systemd/buckle-libinput.service.in \
+	udev/70-bucklespring-libinput.rules.in
 
 wavdir = $(pkgdatadir)/wav
 dist_wav_DATA = wav/01-0.wav wav/01-1.wav wav/02-0.wav wav/02-1.wav	\
