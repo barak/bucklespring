@@ -3,3 +3,21 @@
 *.exe
 cscope.out
 buckle
+rec
+
+# autotools
+/aclocal.m4
+/autom4te.cache/
+/build-aux/
+/config.h
+/config.h.in
+/config.log
+/config.status
+/configure
+/configure~
+/m4/
+/Makefile
+/Makefile.in
+/stamp-h1
+*.dirstamp
+.deps/
