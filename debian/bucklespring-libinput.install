@@ -1,1 +1,6 @@
-buckle-libinput usr/games
+usr/games/buckle-libinput
+usr/share/applications/buckle-libinput.desktop
+usr/share/man/man1/buckle-libinput.1
+usr/share/man/man8/buckle-libinput.service.8
+usr/lib/systemd/user/buckle-libinput.service
+usr/lib/udev/rules.d/70-bucklespring-libinput.rules

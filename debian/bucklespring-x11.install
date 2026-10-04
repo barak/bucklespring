@@ -1,1 +1,5 @@
-buckle-x11 usr/games
+usr/games/buckle-x11
+usr/share/applications/buckle-x11.desktop
+usr/share/man/man1/buckle-x11.1
+usr/share/man/man8/buckle-x11.service.8
+usr/lib/systemd/user/buckle-x11.service

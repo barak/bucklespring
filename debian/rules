@@ -1,63 +1,37 @@
 #!/usr/bin/make -f
 
 export DEB_BUILD_MAINT_OPTIONS=hardening=+all
-export PATH_AUDIO=/usr/share/bucklespring/wav
 
 include /usr/share/dpkg/architecture.mk
 
 %:
 	dh $@
 
-# The manual page for each executable is generated from its own --help output,
-# so that an option added to the program turns up in the page without anyone
-# having to write it down a second time.  Everything help2man cannot know, the
-# prose around the option list, lives in the matching .h2m include file.
-#
-# The COPYRIGHT and AUTHOR sections are made out of --version, so nothing here
-# has to know the version or repeat the licence.
-#
-# --source is what the left of the page footer shows.  Keep it under 32
-# characters: groff has that much room for it at the default 80 columns and
-# ellipsises the rest, which is what became of the longer description that
-# used to be here.  Passing it at all costs the version its place in the
-# footer, help2man having nowhere else to put it, which is the trade taken.
-#
-# help2man has to run the program it documents, which a cross build cannot do,
-# so the generated pages are kept in the source and refreshed here only when
-# building natively.  A native build that changes one is telling you the help
-# text moved and the new page wants committing.
-help2man = help2man --no-info \
-	--source="Bucklespring keyboard sound" --manual="User Commands"
+# The upstream build can generate four "flavours" which differ by how
+# they read keystrokes. Only the x11 and libinput flavours are
+# relevant here, the other two are for Microsoft Windows and MacOS.
+# The libinput flavour is Linux-only. Build profiles are set up to
+# disable each of these.
 
-# One binary per key event source: buckle-x11 grabs the events through X11,
-# buckle-libinput reads the raw input devices, for Wayland and the console.
-execute_after_dh_auto_build:
-	mv buckle buckle-x11
-ifeq ($(DEB_BUILD_GNU_TYPE),$(DEB_HOST_GNU_TYPE))
-	$(help2man) --include=debian/man/buckle-x11.1.h2m \
-		--output=debian/man/buckle-x11.1 ./buckle-x11
-endif
-ifeq ($(DEB_HOST_ARCH_OS),linux)
-	$(MAKE) clean
-	dh_auto_build -- libinput=1
-	mv buckle buckle-libinput
-ifeq ($(DEB_BUILD_GNU_TYPE),$(DEB_HOST_GNU_TYPE))
-	$(help2man) --include=debian/man/buckle-libinput.1.h2m \
-		--output=debian/man/buckle-libinput.1 ./buckle-libinput
-endif
+CONFIGURE_FLAGS = --bindir=/usr/games --enable-tray
+
+ifeq ($(filter pkg.bucklespring.nox11,$(DEB_BUILD_PROFILES)),)
+CONFIGURE_FLAGS += --enable-x11
+else
+CONFIGURE_FLAGS += --disable-x11
 endif
 
-execute_after_dh_auto_clean:
-	$(RM) buckle-x11 buckle-libinput scan-libinput.o
+ifneq ($(filter pkg.bucklespring.nolibinput,$(DEB_BUILD_PROFILES)),)
+CONFIGURE_FLAGS += --disable-libinput
+else ifeq ($(DEB_HOST_ARCH_OS),linux)
+CONFIGURE_FLAGS += --enable-libinput
+else
+CONFIGURE_FLAGS += --disable-libinput
+endif
 
-# 70 sorts after 60-persistent-input.rules, which sets ID_INPUT_KEYBOARD, and
-# before 73-seat-late.rules, which acts on the uaccess tag the rule sets.
-override_dh_installudev:
-	dh_installudev --priority=70
+override_dh_auto_configure:
+	dh_auto_configure -- $(CONFIGURE_FLAGS)
 
-# Both flavours may be installed at once, so each ships its own unit rather
-# than one buckle.service that would collide.  Neither is enabled on install:
-# a program that makes a noise on every keystroke is opt in.
+# Not enabled by default: annoying keyboard noises should be opt-in.
 override_dh_installsystemduser:
-	dh_installsystemduser --no-enable --name=buckle-x11
-	dh_installsystemduser --no-enable --name=buckle-libinput
+	dh_installsystemduser --no-enable

@@ -72,7 +72,7 @@ The 70 in the file name matters: it sorts the rule after
 73-seat-late.rules, which acts on the uaccess tag.
 
 Narrowing the grant to a group of users
---------------------------------------
+---------------------------------------
 
 The uaccess mechanism is per seat rather than per user: it grants to whoever
 holds the active session at the local seat, and /etc/bucklespring/uaccess is
@@ -225,4 +225,4 @@ Note that buckle-libinput prints "Failed to open /dev/input/eventN (Permission
 denied)" on startup for the input devices the rule above does not cover, and
 libinput just skips those. The message is harmless.
 
- -- Barak A. Pearlmutter <bap@debian.org>, Tue,  1 Sep 2026 09:04:54 +0100
+ -- Barak A. Pearlmutter <bap@debian.org>, Mon,  5 Oct 2026 10:20:08 +0100

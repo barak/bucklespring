@@ -18,6 +18,27 @@ Comment: The table mapping Mac virtual keycodes to set-1 scancodes is taken
  This file is only compiled on macOS; it is not built by, or shipped in,
  any of the Debian binary packages.
 
+Files: configure.ac
+       Makefile.am
+       tray.c
+       wl-repeat.c
+       systemd/*
+       udev/*
+Copyright: 2026 Barak A. Pearlmutter <bap@debian.org>
+License: GPL-2+
+Comment: The build system, the system tray icon, the Wayland repeat rate
+ query, the systemd user units and the uaccess udev rule began as Debian
+ packaging and have since moved upstream.
+
+Files: man/*
+Copyright: 2016-2017 Dominik George <nik@naturalnet.de>
+           2026 Barak A. Pearlmutter <bap@debian.org>
+License: GPL-2+
+Comment: The pages for the executables are generated from their own --help
+ and --version output by help2man(1); the prose around the option list, in
+ the matching .h2m include files, was first written for the Debian package
+ by Dominik George.
+
 Files: debian/*
 Copyright: 2016-2017 Dominik George <nik@naturalnet.de>
            2025 Chris Hofstaedtler <zeha@debian.org>,
