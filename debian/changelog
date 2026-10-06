@@ -1,3 +1,10 @@
+bucklespring (1.5.1+git.1.e41a021-2) unstable; urgency=medium
+
+  * Portuguese debconf translation by Américo Monteiro (closes: #1146902)
+  * Catalan debconf translation by poc senderi (closes: #1147192)
+
+ -- Barak A. Pearlmutter <bap@debian.org>  Tue, 06 Oct 2026 17:27:34 +0100
+
 bucklespring (1.5.1+git.1.e41a021-1) unstable; urgency=medium
 
   * New upstream version
