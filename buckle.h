@@ -43,6 +43,13 @@ void buckle_set_gain(int gain);
 int buckle_mute_keycode(void);
 const char *buckle_audio_device(void);
 int buckle_set_audio_device(const char *name);
+/* The clip sets: directories of wav files, one set to a directory. */
+
+char **buckle_clip_sets(void);
+void buckle_clip_sets_free(char **list);
+const char *buckle_clip_set(void);
+int buckle_set_clip_set(const char *name);
+
 int buckle_audio_connected(void);
 int buckle_audio_recover(void);
 char **buckle_audio_devices(void);

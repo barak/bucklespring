@@ -9,7 +9,7 @@
  * properties rather than widgets, so a volume there could only ever be a
  * ladder of radio items, a device list has to be rebuilt as a submenu
  * whenever ALC's answer changes, and the panel decides when the menu closes.
- * A window has a slider, a combo box and none of that machinery.
+ * A window has a slider, two combo boxes and none of that machinery.
  *
  * The icon is a StatusNotifierItem, put up through libayatana-appindicator.
  * That is what KDE shows natively and what the AppIndicator extension shows
@@ -56,6 +56,10 @@ static GtkWidget *item_mute;
 
 static char **device_names = NULL;
 
+/* The same again for the clip sets, which can be added to on disk. */
+
+static char **clip_names = NULL;
+
 /*
  * The controls window: built the first time it is asked for, and from then on
  * kept and hidden rather than destroyed, so that it comes back where the user
@@ -65,12 +69,14 @@ static char **device_names = NULL;
 static GtkWidget *window;
 static GtkWidget *win_mute;
 static GtkWidget *win_volume;
+static GtkWidget *win_clips;
 static GtkWidget *win_devices;
 static GtkWidget *win_hrtf;
 static GtkWidget *win_hrtf_state;
 
 static void window_sync(void);
 static void window_show(void);
+static void window_refill_clips(void);
 static void window_refill_devices(void);
 
 static int syncing = 0;
@@ -289,6 +295,44 @@ static void sync_devices(void)
 }
 
 
+/* The same again, for the sets on disk. */
+
+static int clips_differ(char **new)
+{
+	size_t i;
+
+	if(clip_names == NULL) {
+		return 1;
+	}
+
+	for(i = 0; ; i++) {
+		if(clip_names[i] == NULL && new[i] == NULL) {
+			return 0;
+		}
+		if(clip_names[i] == NULL || new[i] == NULL) {
+			return 1;
+		}
+		if(g_strcmp0(clip_names[i], new[i]) != 0) {
+			return 1;
+		}
+	}
+}
+
+
+static void sync_clips(void)
+{
+	char **list = buckle_clip_sets();
+
+	if(list != NULL && clips_differ(list)) {
+		buckle_clip_sets_free(clip_names);
+		clip_names = list;
+		window_refill_clips();
+	} else {
+		buckle_clip_sets_free(list);
+	}
+}
+
+
 static gboolean on_device_tick(gpointer data)
 {
 	(void)data;
@@ -301,13 +345,14 @@ static gboolean on_device_tick(gpointer data)
 		buckle_audio_recover();
 	}
 
-	/* The list behind the combo box is another matter: asking ALC for it
-	 * is a round trip to the sound server, and nothing shows it unless
-	 * the window is up.
+	/* The lists behind the two combo boxes are another matter: asking ALC
+	 * for them is a round trip to the sound server, and nothing shows
+	 * them unless the window is up.
 	 */
 
 	if(window != NULL && gtk_widget_get_visible(window)) {
 		sync_devices();
+		sync_clips();
 	}
 
 	return G_SOURCE_CONTINUE;
@@ -337,6 +382,28 @@ static void on_win_volume(GtkRange *range, gpointer data)
 	}
 	buckle_set_gain((int)gtk_range_get_value(range));
 	sync_menu();
+}
+
+
+static void on_win_clips(GtkComboBox *combo, gpointer data)
+{
+	char *name;
+
+	(void)data;
+
+	if(syncing) {
+		return;
+	}
+
+	name = gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(combo));
+
+	/* The samples already loaded belong to the old set and are dropped,
+	 * so the first press of each key after this reloads it. */
+
+	if(name != NULL && g_strcmp0(name, buckle_clip_set()) != 0) {
+		buckle_set_clip_set(name);
+	}
+	g_free(name);
 }
 
 
@@ -390,9 +457,9 @@ static void on_win_close(GtkButton *button, gpointer data)
 
 
 /*
- * A list that has changed under us, as the audio devices do.  Rebuilt rather
- * than merged: it is a handful of entries and the combo box has no notion of
- * a diff.
+ * A list that has changed under us, as the audio devices and the clip sets
+ * both do.  Rebuilt rather than merged: both lists are a handful of entries
+ * and the combo box has no notion of a diff.
  */
 
 static void window_fill_combo(GtkWidget *combo, char **list,
@@ -421,6 +488,18 @@ static void window_fill_combo(GtkWidget *combo, char **list,
 	gtk_widget_set_sensitive(combo, i > 0);
 
 	syncing = saved;
+}
+
+
+/* buckle_clip_set() is NULL where -p named a directory of its own, which no
+ * row can stand for, and then none is selected. */
+
+static void window_refill_clips(void)
+{
+	if(window != NULL) {
+		window_fill_combo(win_clips, clip_names, buckle_clip_set(),
+				"(none installed)");
+	}
 }
 
 
@@ -533,6 +612,10 @@ static void window_build(void)
 			G_CALLBACK(on_win_volume), NULL);
 	window_row(grid, row++, "Volume", win_volume);
 
+	win_clips = gtk_combo_box_text_new();
+	g_signal_connect(win_clips, "changed", G_CALLBACK(on_win_clips), NULL);
+	window_row(grid, row++, "Key clips", win_clips);
+
 	win_devices = gtk_combo_box_text_new();
 	g_signal_connect(win_devices, "changed", G_CALLBACK(on_win_device), NULL);
 	window_row(grid, row++, "Audio device", win_devices);
@@ -598,10 +681,12 @@ static void window_show(void)
 		window_build();
 	}
 
-	/* Nothing asks ALC while the window is down, so the list may be
-	 * stale, or, the first time, empty. */
+	/* Nothing asks ALC or reads the clip directory while the window is
+	 * down, so both lists may be stale, or, the first time, empty. */
 
 	sync_devices();
+	sync_clips();
+	window_refill_clips();
 	window_refill_devices();
 
 	window_sync();

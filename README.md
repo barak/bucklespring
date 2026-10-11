@@ -162,13 +162,13 @@ on regardless, as it does on a console where there is no display at all.
 
 #### The preferences window
 
-The volume, the audio device and the headphone filter live here rather than in
-the menu.  A menu on a tray icon travels over dbusmenu, which carries labels
-and check marks rather than widgets: a volume there can only be a ladder of
-radio items, a device list has to be rebuilt as a submenu every time it
-changes, and the panel, not the program, decides when the menu closes.  A
-window has a slider and a combo box and none of that.  It also means that a
-desktop with nothing listening for the icon still has all of it.
+The volume, the clip set, the audio device and the headphone filter live here
+rather than in the menu.  A menu on a tray icon travels over dbusmenu, which
+carries labels and check marks rather than widgets: a volume there can only be
+a ladder of radio items, a device list has to be rebuilt as a submenu every
+time it changes, and the panel, not the program, decides when the menu closes.
+A window has a slider and two combo boxes and none of that.  It also means
+that a desktop with nothing listening for the icon still has all of it.
 
 The running buckle puts the window up when asked:
 
@@ -237,6 +237,21 @@ $ sudo ./buckle-mac &
 For better performance and to resolve some issues, it is recommended to run the program in **Administrator** mode.
 
 
+Key clips
+---------
+
+The samples live in one directory per set, under
+`/usr/share/bucklespring/clips`, and the Model-M recordings this project began
+with are the set named `bucklespring`. `--list-clips` says which are
+installed, `--clips=NAME` picks one, and the preferences window has the same
+list and switches between them while running; the samples of the old set are
+dropped and the new ones load as you type. `-p PATH` still points at a
+directory of wav files directly, for a set that is not installed alongside the
+others.
+
+A set need not cover every key. Where it does not, `-f` falls back to a
+single sample for whatever it is missing.
+
 Usage
 -----
 
@@ -245,6 +260,8 @@ Usage: buckle-x11 [options]
 
 Options:
 
+      --clips=NAME          play the clip set NAME; --list-clips says
+                            which are installed
   -d, --device=DEVICE       use OpenAL audio device DEVICE
   -f, --fallback-sound      use a fallback sound for unknown keys
   -g, --gain=GAIN           set playback gain [0..100]
@@ -257,6 +274,7 @@ Options:
                             narrows it to some of left, middle, right,
                             side, extra, wheel, hwheel, all, none
   -h, --help                show help
+      --list-clips          list the clip sets that are installed
   -l, --list-devices        list available OpenAL audio devices
       --preferences         open the preferences window of the
                             running bucklespring

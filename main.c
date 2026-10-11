@@ -34,6 +34,7 @@
 #include <getopt.h>
 #include <time.h>
 #include <pthread.h>
+#include <dirent.h>
 
 #ifdef __APPLE__
 #include <OpenAL/al.h>
@@ -70,6 +71,10 @@ static void version(char *exe);
 static void list_devices(void);
 static int parse_mouse(const char *arg);
 static int parse_hrtf(const char *arg);
+static const char *clip_set_path(const char *name);
+static const char *clip_set_path_quiet(const char *name);
+static void list_clips(void);
+static int compare_names(const void *a, const void *b);
 static void audio_forget_sources(void);
 static ALCenum device_specifier(void);
 static const char *default_device_name(void);
@@ -151,16 +156,20 @@ enum {
 	OPT_REPEAT_RATE,
 	OPT_NO_TRAY,
 	OPT_HRTF,
+	OPT_CLIPS,
+	OPT_LIST_CLIPS,
 	OPT_PREFERENCES,
 };
 
 static const char short_opts[] = "d:fg:hlm:Mp:rs:c::vV";
 
 static const struct option long_opts[] = {
+	{ "clips",          required_argument, NULL, OPT_CLIPS },
 	{ "device",         required_argument, NULL, 'd' },
 	{ "fallback-sound", no_argument,       NULL, 'f' },
 	{ "gain",           required_argument, NULL, 'g' },
 	{ "help",           no_argument,       NULL, 'h' },
+	{ "list-clips",     no_argument,       NULL, OPT_LIST_CLIPS },
 	{ "list-devices",   no_argument,       NULL, 'l' },
 	{ "preferences",    no_argument,       NULL, OPT_PREFERENCES },
 	{ "mute-keycode",   required_argument, NULL, 'm' },
@@ -238,6 +247,12 @@ int main(int argc, char **argv)
 			case 'r':
 				opt_no_repeat = 1;
 				break;
+			case OPT_CLIPS:
+				opt_path_audio = clip_set_path(optarg);
+				break;
+			case OPT_LIST_CLIPS:
+				list_clips();
+				return 0;
 			case OPT_HRTF:
 				opt_hrtf = parse_hrtf(optarg);
 				break;
@@ -355,6 +370,8 @@ static void usage(char *exe, int status)
 		"\n"
 		"Options:\n"
 		"\n"
+		"      --clips=NAME          play the clip set NAME; --list-clips says\n"
+		"                            which are installed\n"
 		"  -d, --device=DEVICE       use OpenAL audio device DEVICE\n"
 		"  -f, --fallback-sound      use a fallback sound for unknown keys\n"
 		"  -g, --gain=GAIN           set playback gain [0..100]\n"
@@ -367,6 +384,7 @@ static void usage(char *exe, int status)
 		"                            narrows it to some of left, middle, right,\n"
 		"                            side, extra, wheel, hwheel, all, none\n"
 		"  -h, --help                show help\n"
+		"      --list-clips          list the clip sets that are installed\n"
 		"  -l, --list-devices        list available OpenAL audio devices\n"
 		"      --preferences         open the preferences window of the\n"
 		"                            running bucklespring\n"
@@ -408,6 +426,100 @@ static void version(char *exe)
 	printf("There is NO WARRANTY, to the extent permitted by law.\n");
 	printf("\n");
 	printf("Written by Ico Doornekamp.\n");
+}
+
+
+/*
+ * A clip set is a directory of wav files under PATH_CLIPS, one subdirectory
+ * per set.  Which one is in use is simply which directory play() loads from,
+ * so switching is a matter of pointing opt_path_audio somewhere else and
+ * dropping the samples already loaded.
+ */
+
+char **buckle_clip_sets(void)
+{
+	DIR *d = opendir(PATH_CLIPS);
+	struct dirent *e;
+	char **out = NULL;
+	size_t n = 0;
+
+	if(d == NULL) {
+		return NULL;
+	}
+
+	while((e = readdir(d)) != NULL) {
+		char **grown;
+
+		if(e->d_name[0] == '.') {
+			continue;
+		}
+		if(e->d_type != DT_DIR && e->d_type != DT_UNKNOWN) {
+			continue;
+		}
+
+		grown = realloc(out, (n + 2) * sizeof *out);
+		if(grown == NULL) {
+			break;
+		}
+		out = grown;
+		out[n] = strdup(e->d_name);
+		if(out[n] == NULL) {
+			break;
+		}
+		n++;
+		out[n] = NULL;
+	}
+
+	closedir(d);
+
+	/* readdir order is whatever the filesystem feels like; a menu and a
+	 * listing both want it settled. */
+
+	if(out != NULL) {
+		qsort(out, n, sizeof *out, compare_names);
+	}
+
+	return out;
+}
+
+
+void buckle_clip_sets_free(char **list)
+{
+	buckle_audio_devices_free(list);
+}
+
+
+/* The set in use, or NULL when -p pointed somewhere outside PATH_CLIPS. */
+
+const char *buckle_clip_set(void)
+{
+	static const char prefix[] = PATH_CLIPS "/";
+
+	if(opt_path_audio != NULL &&
+	   strncmp(opt_path_audio, prefix, sizeof prefix - 1) == 0) {
+		return opt_path_audio + sizeof prefix - 1;
+	}
+
+	return NULL;
+}
+
+
+int buckle_set_clip_set(const char *name)
+{
+	const char *path = clip_set_path_quiet(name);
+
+	if(path == NULL) {
+		return -1;
+	}
+
+	pthread_mutex_lock(&audio_lock);
+	audio_forget_sources();
+	opt_path_audio = path;
+	pthread_mutex_unlock(&audio_lock);
+
+	printd("Clip set is now \"%s\"", name);
+
+	return 0;
 }
 
 
@@ -652,6 +764,72 @@ static int parse_mouse(const char *arg)
 	free(spec);
 
 	return bits;
+}
+
+
+static int compare_names(const void *a, const void *b)
+{
+	return strcmp(*(const char **)a, *(const char **)b);
+}
+
+
+/* PATH_CLIPS/name, kept for the life of the process. */
+
+static const char *clip_set_path_quiet(const char *name)
+{
+	char *path;
+	size_t n;
+
+	if(name == NULL || *name == '\0' || strchr(name, '/') != NULL) {
+		return NULL;
+	}
+
+	/* snprintf rather than asprintf, which would want _GNU_SOURCE. */
+
+	n = strlen(PATH_CLIPS) + 1 + strlen(name) + 1;
+	path = malloc(n);
+	if(path == NULL) {
+		return NULL;
+	}
+	snprintf(path, n, "%s/%s", PATH_CLIPS, name);
+
+	return path;
+}
+
+
+static const char *clip_set_path(const char *name)
+{
+	const char *path = clip_set_path_quiet(name);
+	char **list;
+	size_t i;
+
+	if(path != NULL) {
+		return path;
+	}
+
+	fprintf(stderr, "Not a clip set name: \"%s\"\n", name);
+	fprintf(stderr, "Installed sets are:");
+	list = buckle_clip_sets();
+	for(i = 0; list != NULL && list[i] != NULL; i++) {
+		fprintf(stderr, " %s", list[i]);
+	}
+	fprintf(stderr, "\n");
+	buckle_clip_sets_free(list);
+	exit(1);
+}
+
+
+static void list_clips(void)
+{
+	char **list = buckle_clip_sets();
+	size_t i;
+
+	printf("Installed clip sets:");
+	for(i = 0; list != NULL && list[i] != NULL; i++) {
+		printf(" %s", list[i]);
+	}
+	printf("\n");
+	buckle_clip_sets_free(list);
 }
 
 

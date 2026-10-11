@@ -1,9 +1,13 @@
 AM_CFLAGS = -Wall
 
-# Every flavour looks for its samples in the same place.  This has to be built
-# here rather than in configure.ac: pkgdatadir is written in terms of
+# Every flavour looks for its samples in the same place.  These have to be
+# built here rather than in configure.ac: pkgdatadir is written in terms of
 # ${prefix}, which only make expands.
-buckle_cppflags = -DPATH_AUDIO='"$(wavdir)"'
+#
+# PATH_CLIPS is the directory the clip sets sit in, one subdirectory each, and
+# PATH_AUDIO is the one to use when nothing says otherwise.
+buckle_cppflags = -DPATH_CLIPS='"$(clipsdir)"' \
+	-DPATH_AUDIO='"$(clipsdir)/$(DEFAULT_CLIPS)"'
 
 bin_PROGRAMS =
 dist_man1_MANS =
@@ -147,57 +151,220 @@ EXTRA_DIST = README.md LICENSE \
 	systemd/buckle-x11.service.in systemd/buckle-libinput.service.in \
 	udev/70-bucklespring-libinput.rules.in
 
-wavdir = $(pkgdatadir)/wav
-dist_wav_DATA = wav/01-0.wav wav/01-1.wav wav/02-0.wav wav/02-1.wav	\
-	wav/03-0.wav wav/03-1.wav wav/04-0.wav wav/04-1.wav		\
-	wav/05-0.wav wav/05-1.wav wav/06-0.wav wav/06-1.wav		\
-	wav/07-0.wav wav/07-1.wav wav/08-0.wav wav/08-1.wav		\
-	wav/09-0.wav wav/09-1.wav wav/0a-0.wav wav/0a-1.wav		\
-	wav/0b-0.wav wav/0b-1.wav wav/0c-0.wav wav/0c-1.wav		\
-	wav/0d-0.wav wav/0d-1.wav wav/0e-0.wav wav/0e-1.wav		\
-	wav/0f-0.wav wav/0f-1.wav wav/10-0.wav wav/10-1.wav		\
-	wav/11-0.wav wav/11-1.wav wav/12-0.wav wav/12-1.wav		\
-	wav/13-0.wav wav/13-1.wav wav/14-0.wav wav/14-1.wav		\
-	wav/15-0.wav wav/15-1.wav wav/16-0.wav wav/16-1.wav		\
-	wav/17-0.wav wav/17-1.wav wav/18-0.wav wav/18-1.wav		\
-	wav/19-0.wav wav/19-1.wav wav/1a-0.wav wav/1a-1.wav		\
-	wav/1b-0.wav wav/1b-1.wav wav/1c-0.wav wav/1c-1.wav		\
-	wav/1d-0.wav wav/1d-1.wav wav/1e-0.wav wav/1e-1.wav		\
-	wav/1f-0.wav wav/1f-1.wav wav/20-0.wav wav/20-1.wav		\
-	wav/21-0.wav wav/21-1.wav wav/22-0.wav wav/22-1.wav		\
-	wav/23-0.wav wav/23-1.wav wav/24-0.wav wav/24-1.wav		\
-	wav/25-0.wav wav/25-1.wav wav/26-0.wav wav/26-1.wav		\
-	wav/27-0.wav wav/27-1.wav wav/28-0.wav wav/28-1.wav		\
-	wav/29-0.wav wav/29-1.wav wav/2a-0.wav wav/2a-1.wav		\
-	wav/2b-0.wav wav/2b-1.wav wav/2c-0.wav wav/2c-1.wav		\
-	wav/2d-0.wav wav/2d-1.wav wav/2e-0.wav wav/2e-1.wav		\
-	wav/2f-0.wav wav/2f-1.wav wav/30-0.wav wav/30-1.wav		\
-	wav/31-0.wav wav/31-1.wav wav/32-0.wav wav/32-1.wav		\
-	wav/33-0.wav wav/33-1.wav wav/34-0.wav wav/34-1.wav		\
-	wav/35-0.wav wav/35-1.wav wav/36-0.wav wav/36-1.wav		\
-	wav/37-0.wav wav/37-1.wav wav/38-0.wav wav/38-1.wav		\
-	wav/39-0.wav wav/39-1.wav wav/3a-0.wav wav/3a-1.wav		\
-	wav/3b-0.wav wav/3b-1.wav wav/3c-0.wav wav/3c-1.wav		\
-	wav/3d-0.wav wav/3d-1.wav wav/3e-0.wav wav/3e-1.wav		\
-	wav/3f-0.wav wav/3f-1.wav wav/40-0.wav wav/40-1.wav		\
-	wav/41-0.wav wav/41-1.wav wav/42-0.wav wav/42-1.wav		\
-	wav/43-0.wav wav/43-1.wav wav/44-0.wav wav/44-1.wav		\
-	wav/45-0.wav wav/45-1.wav wav/46-0.wav wav/46-1.wav		\
-	wav/47-0.wav wav/47-1.wav wav/48-0.wav wav/48-1.wav		\
-	wav/49-0.wav wav/49-1.wav wav/4a-0.wav wav/4a-1.wav		\
-	wav/4b-0.wav wav/4b-1.wav wav/4c-0.wav wav/4c-1.wav		\
-	wav/4d-0.wav wav/4d-1.wav wav/4e-0.wav wav/4e-1.wav		\
-	wav/4f-0.wav wav/4f-1.wav wav/50-0.wav wav/50-1.wav		\
-	wav/51-0.wav wav/51-1.wav wav/52-0.wav wav/52-1.wav		\
-	wav/53-0.wav wav/53-1.wav wav/56-0.wav wav/56-1.wav		\
-	wav/57-0.wav wav/57-1.wav wav/58-0.wav wav/58-1.wav		\
-	wav/5b-0.wav wav/5b-1.wav wav/60-0.wav wav/60-1.wav		\
-	wav/61-0.wav wav/61-1.wav wav/62-0.wav wav/62-1.wav		\
-	wav/63-0.wav wav/63-1.wav wav/64-0.wav wav/64-1.wav		\
-	wav/66-0.wav wav/66-1.wav wav/67-0.wav wav/67-1.wav		\
-	wav/68-0.wav wav/68-1.wav wav/69-0.wav wav/69-1.wav		\
-	wav/6a-0.wav wav/6a-1.wav wav/6b-0.wav wav/6b-1.wav		\
-	wav/6c-0.wav wav/6c-1.wav wav/6d-0.wav wav/6d-1.wav		\
-	wav/6e-0.wav wav/6e-1.wav wav/6f-0.wav wav/6f-1.wav		\
-	wav/77-0.wav wav/7d-0.wav wav/7d-1.wav wav/ff-0.wav		\
-	wav/ff-1.wav
+# The clip sets.  Each is a subdirectory of clipsdir holding one wav per
+# scancode and press state; DEFAULT_CLIPS names the one used when no
+# --clips says otherwise.
+DEFAULT_CLIPS = bucklespring
+clipsdir = $(pkgdatadir)/clips
+
+bucklespringclipsdir = $(clipsdir)/bucklespring
+dist_bucklespringclips_DATA = \
+	clips/bucklespring/01-0.wav \
+	clips/bucklespring/01-1.wav \
+	clips/bucklespring/02-0.wav \
+	clips/bucklespring/02-1.wav \
+	clips/bucklespring/03-0.wav \
+	clips/bucklespring/03-1.wav \
+	clips/bucklespring/04-0.wav \
+	clips/bucklespring/04-1.wav \
+	clips/bucklespring/05-0.wav \
+	clips/bucklespring/05-1.wav \
+	clips/bucklespring/06-0.wav \
+	clips/bucklespring/06-1.wav \
+	clips/bucklespring/07-0.wav \
+	clips/bucklespring/07-1.wav \
+	clips/bucklespring/08-0.wav \
+	clips/bucklespring/08-1.wav \
+	clips/bucklespring/09-0.wav \
+	clips/bucklespring/09-1.wav \
+	clips/bucklespring/0a-0.wav \
+	clips/bucklespring/0a-1.wav \
+	clips/bucklespring/0b-0.wav \
+	clips/bucklespring/0b-1.wav \
+	clips/bucklespring/0c-0.wav \
+	clips/bucklespring/0c-1.wav \
+	clips/bucklespring/0d-0.wav \
+	clips/bucklespring/0d-1.wav \
+	clips/bucklespring/0e-0.wav \
+	clips/bucklespring/0e-1.wav \
+	clips/bucklespring/0f-0.wav \
+	clips/bucklespring/0f-1.wav \
+	clips/bucklespring/10-0.wav \
+	clips/bucklespring/10-1.wav \
+	clips/bucklespring/11-0.wav \
+	clips/bucklespring/11-1.wav \
+	clips/bucklespring/12-0.wav \
+	clips/bucklespring/12-1.wav \
+	clips/bucklespring/13-0.wav \
+	clips/bucklespring/13-1.wav \
+	clips/bucklespring/14-0.wav \
+	clips/bucklespring/14-1.wav \
+	clips/bucklespring/15-0.wav \
+	clips/bucklespring/15-1.wav \
+	clips/bucklespring/16-0.wav \
+	clips/bucklespring/16-1.wav \
+	clips/bucklespring/17-0.wav \
+	clips/bucklespring/17-1.wav \
+	clips/bucklespring/18-0.wav \
+	clips/bucklespring/18-1.wav \
+	clips/bucklespring/19-0.wav \
+	clips/bucklespring/19-1.wav \
+	clips/bucklespring/1a-0.wav \
+	clips/bucklespring/1a-1.wav \
+	clips/bucklespring/1b-0.wav \
+	clips/bucklespring/1b-1.wav \
+	clips/bucklespring/1c-0.wav \
+	clips/bucklespring/1c-1.wav \
+	clips/bucklespring/1d-0.wav \
+	clips/bucklespring/1d-1.wav \
+	clips/bucklespring/1e-0.wav \
+	clips/bucklespring/1e-1.wav \
+	clips/bucklespring/1f-0.wav \
+	clips/bucklespring/1f-1.wav \
+	clips/bucklespring/20-0.wav \
+	clips/bucklespring/20-1.wav \
+	clips/bucklespring/21-0.wav \
+	clips/bucklespring/21-1.wav \
+	clips/bucklespring/22-0.wav \
+	clips/bucklespring/22-1.wav \
+	clips/bucklespring/23-0.wav \
+	clips/bucklespring/23-1.wav \
+	clips/bucklespring/24-0.wav \
+	clips/bucklespring/24-1.wav \
+	clips/bucklespring/25-0.wav \
+	clips/bucklespring/25-1.wav \
+	clips/bucklespring/26-0.wav \
+	clips/bucklespring/26-1.wav \
+	clips/bucklespring/27-0.wav \
+	clips/bucklespring/27-1.wav \
+	clips/bucklespring/28-0.wav \
+	clips/bucklespring/28-1.wav \
+	clips/bucklespring/29-0.wav \
+	clips/bucklespring/29-1.wav \
+	clips/bucklespring/2a-0.wav \
+	clips/bucklespring/2a-1.wav \
+	clips/bucklespring/2b-0.wav \
+	clips/bucklespring/2b-1.wav \
+	clips/bucklespring/2c-0.wav \
+	clips/bucklespring/2c-1.wav \
+	clips/bucklespring/2d-0.wav \
+	clips/bucklespring/2d-1.wav \
+	clips/bucklespring/2e-0.wav \
+	clips/bucklespring/2e-1.wav \
+	clips/bucklespring/2f-0.wav \
+	clips/bucklespring/2f-1.wav \
+	clips/bucklespring/30-0.wav \
+	clips/bucklespring/30-1.wav \
+	clips/bucklespring/31-0.wav \
+	clips/bucklespring/31-1.wav \
+	clips/bucklespring/32-0.wav \
+	clips/bucklespring/32-1.wav \
+	clips/bucklespring/33-0.wav \
+	clips/bucklespring/33-1.wav \
+	clips/bucklespring/34-0.wav \
+	clips/bucklespring/34-1.wav \
+	clips/bucklespring/35-0.wav \
+	clips/bucklespring/35-1.wav \
+	clips/bucklespring/36-0.wav \
+	clips/bucklespring/36-1.wav \
+	clips/bucklespring/37-0.wav \
+	clips/bucklespring/37-1.wav \
+	clips/bucklespring/38-0.wav \
+	clips/bucklespring/38-1.wav \
+	clips/bucklespring/39-0.wav \
+	clips/bucklespring/39-1.wav \
+	clips/bucklespring/3a-0.wav \
+	clips/bucklespring/3a-1.wav \
+	clips/bucklespring/3b-0.wav \
+	clips/bucklespring/3b-1.wav \
+	clips/bucklespring/3c-0.wav \
+	clips/bucklespring/3c-1.wav \
+	clips/bucklespring/3d-0.wav \
+	clips/bucklespring/3d-1.wav \
+	clips/bucklespring/3e-0.wav \
+	clips/bucklespring/3e-1.wav \
+	clips/bucklespring/3f-0.wav \
+	clips/bucklespring/3f-1.wav \
+	clips/bucklespring/40-0.wav \
+	clips/bucklespring/40-1.wav \
+	clips/bucklespring/41-0.wav \
+	clips/bucklespring/41-1.wav \
+	clips/bucklespring/42-0.wav \
+	clips/bucklespring/42-1.wav \
+	clips/bucklespring/43-0.wav \
+	clips/bucklespring/43-1.wav \
+	clips/bucklespring/44-0.wav \
+	clips/bucklespring/44-1.wav \
+	clips/bucklespring/45-0.wav \
+	clips/bucklespring/45-1.wav \
+	clips/bucklespring/46-0.wav \
+	clips/bucklespring/46-1.wav \
+	clips/bucklespring/47-0.wav \
+	clips/bucklespring/47-1.wav \
+	clips/bucklespring/48-0.wav \
+	clips/bucklespring/48-1.wav \
+	clips/bucklespring/49-0.wav \
+	clips/bucklespring/49-1.wav \
+	clips/bucklespring/4a-0.wav \
+	clips/bucklespring/4a-1.wav \
+	clips/bucklespring/4b-0.wav \
+	clips/bucklespring/4b-1.wav \
+	clips/bucklespring/4c-0.wav \
+	clips/bucklespring/4c-1.wav \
+	clips/bucklespring/4d-0.wav \
+	clips/bucklespring/4d-1.wav \
+	clips/bucklespring/4e-0.wav \
+	clips/bucklespring/4e-1.wav \
+	clips/bucklespring/4f-0.wav \
+	clips/bucklespring/4f-1.wav \
+	clips/bucklespring/50-0.wav \
+	clips/bucklespring/50-1.wav \
+	clips/bucklespring/51-0.wav \
+	clips/bucklespring/51-1.wav \
+	clips/bucklespring/52-0.wav \
+	clips/bucklespring/52-1.wav \
+	clips/bucklespring/53-0.wav \
+	clips/bucklespring/53-1.wav \
+	clips/bucklespring/56-0.wav \
+	clips/bucklespring/56-1.wav \
+	clips/bucklespring/57-0.wav \
+	clips/bucklespring/57-1.wav \
+	clips/bucklespring/58-0.wav \
+	clips/bucklespring/58-1.wav \
+	clips/bucklespring/5b-0.wav \
+	clips/bucklespring/5b-1.wav \
+	clips/bucklespring/60-0.wav \
+	clips/bucklespring/60-1.wav \
+	clips/bucklespring/61-0.wav \
+	clips/bucklespring/61-1.wav \
+	clips/bucklespring/62-0.wav \
+	clips/bucklespring/62-1.wav \
+	clips/bucklespring/63-0.wav \
+	clips/bucklespring/63-1.wav \
+	clips/bucklespring/64-0.wav \
+	clips/bucklespring/64-1.wav \
+	clips/bucklespring/66-0.wav \
+	clips/bucklespring/66-1.wav \
+	clips/bucklespring/67-0.wav \
+	clips/bucklespring/67-1.wav \
+	clips/bucklespring/68-0.wav \
+	clips/bucklespring/68-1.wav \
+	clips/bucklespring/69-0.wav \
+	clips/bucklespring/69-1.wav \
+	clips/bucklespring/6a-0.wav \
+	clips/bucklespring/6a-1.wav \
+	clips/bucklespring/6b-0.wav \
+	clips/bucklespring/6b-1.wav \
+	clips/bucklespring/6c-0.wav \
+	clips/bucklespring/6c-1.wav \
+	clips/bucklespring/6d-0.wav \
+	clips/bucklespring/6d-1.wav \
+	clips/bucklespring/6e-0.wav \
+	clips/bucklespring/6e-1.wav \
+	clips/bucklespring/6f-0.wav \
+	clips/bucklespring/6f-1.wav \
+	clips/bucklespring/77-0.wav \
+	clips/bucklespring/7d-0.wav \
+	clips/bucklespring/7d-1.wav \
+	clips/bucklespring/ff-0.wav \
+	clips/bucklespring/ff-1.wav

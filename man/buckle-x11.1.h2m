@@ -40,12 +40,12 @@ leaves the icon out.  It is a StatusNotifierItem, which KDE Plasma shows as it
 is and GNOME Shell shows through an extension; where nothing is listening
 there is simply no icon and nothing else changes.
 .PP
-The volume, the audio device and the headphone filter are in that window, and
-not in the menu: a menu on a tray icon travels over dbusmenu, which carries
-labels and check marks rather than widgets, so a volume there can only be a
-ladder of radio items and a device list has to be rebuilt as a submenu
-whenever it changes.  It also means a desktop with nowhere to put the icon
-still has all of it.  The running
+The volume, the clip set, the audio device and the headphone filter are in
+that window, and not in the menu: a menu on a tray icon travels over dbusmenu,
+which carries labels and check marks rather than widgets, so a volume there
+can only be a ladder of radio items and a device list has to be rebuilt as a
+submenu whenever it changes.  It also means a desktop with nowhere to put the
+icon still has all of it.  The running
 .B buckle\-x11
 puts the window up when it is asked:
 .B \-\-preferences
@@ -70,6 +70,22 @@ believes it is talking to headphones, and
 .B \-\-hrtf=auto
 is that default; the preferences window offers the same three choices while
 running.
+
+The samples live one set to a directory under
+.IR /usr/share/bucklespring/clips ,
+the Model M recordings the program began with being the set called
+.IR bucklespring .
+.B \-\-list\-clips
+says which are installed and
+.B \-\-clips
+picks one; the preferences window lists them too and switches between them as
+it runs, dropping the samples of the old set so that the new ones load as you
+type.
+.B \-p
+still names a directory of wav files directly, for a set kept somewhere of
+its own.  A set that does not cover every key wants
+.B \-f
+alongside it.
 
 [SEE ALSO]
 .BR buckle\-x11.service (8),
