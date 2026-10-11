@@ -49,10 +49,10 @@ dnl its OpenAL out of the tree rather than from pkg-config, and win32/ is not
 dnl shipped here, so that one is wired up but untested.
 AS_IF([test "x$enable_windows" = xyes],
   [AUDIO_CFLAGS='-I$(top_srcdir)/win32/include -I$(top_srcdir)/win32/include/AL'
-   AUDIO_LIBS='-L$(top_srcdir)/win32/lib -lALURE32 -lOpenAL32'
+   AUDIO_LIBS='-L$(top_srcdir)/win32/lib -lsndfile -lOpenAL32'
    AC_SUBST([AUDIO_CFLAGS])
    AC_SUBST([AUDIO_LIBS])],
-  [PKG_CHECK_MODULES([AUDIO],[openal alure])])
+  [PKG_CHECK_MODULES([AUDIO],[openal sndfile])])
 
 AS_IF([test "x$enable_x11" = xauto],
   [AS_CASE([$host_kind], [linux|other], [], [enable_x11=no])])

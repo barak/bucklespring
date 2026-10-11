@@ -86,6 +86,13 @@ still names a directory of wav files directly, for a set kept somewhere of
 its own.  A set that does not cover every key wants
 .B \-f
 alongside it.
+.PP
+Clips are read with
+.BR libsndfile (3),
+so a set may be wav, ogg, opus or flac, the first of those found for a key
+winning in that order; the compressed ones are much the smaller once several
+sets are installed.  Anything with more than one channel is mixed down to
+mono, OpenAL positioning only single channel buffers.
 
 [SEE ALSO]
 .BR buckle\-x11.service (8),

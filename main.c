@@ -38,12 +38,12 @@
 
 #ifdef __APPLE__
 #include <OpenAL/al.h>
-#include <OpenAL/alure.h>
+#include <sndfile.h>
 #else
 #include <AL/al.h>
 #include <AL/alc.h>
 #include <AL/alext.h>
-#include <AL/alure.h>
+#include <sndfile.h>
 #endif
 
 /* ALC_SOFT_HRTF lives in alext.h, which the OpenAL framework on macOS does
@@ -76,6 +76,7 @@ static const char *clip_set_path_quiet(const char *name);
 static void list_clips(void);
 static int compare_names(const void *a, const void *b);
 static void audio_forget_sources(void);
+static ALuint find_clip(char *path, size_t len, int code, int press);
 static ALCenum device_specifier(void);
 static const char *default_device_name(void);
 static int audio_open(const char *name);
@@ -388,7 +389,7 @@ static void usage(char *exe, int status)
 		"  -l, --list-devices        list available OpenAL audio devices\n"
 		"      --preferences         open the preferences window of the\n"
 		"                            running bucklespring\n"
-		"  -p, --audio-path=PATH     load .wav files from directory PATH\n"
+		"  -p, --audio-path=PATH     load clips from the directory PATH\n"
 		"  -r, --no-repeat           stay silent while a held key auto repeats\n"
 		"      --repeat-delay=MS     wait MS before the first repeat, overriding\n"
 		"                            what the compositor or the kernel says\n"
@@ -591,6 +592,117 @@ void buckle_audio_devices_free(char **list)
 		free(list[i]);
 	}
 	free(list);
+}
+
+
+/*
+ * Read one clip into an AL buffer, 0 if it cannot be had.
+ *
+ * Brought to mono whatever it arrives as: OpenAL does not position a
+ * multi-channel buffer, it plays it as it stands, so a stereo clip set would
+ * quietly lose the left-to-right placement of the keys, which is most of the
+ * point of this program.  AL_SOFT_source_spatialize exists to ask for it
+ * anyway, but mixing down is both simpler and what the samples want.
+ *
+ * libsndfile reads rather more than wav, so a clip set may be ogg, opus or
+ * flac instead, at a fraction of the size.  find_clip() picks the extension.
+ */
+
+static ALuint load_clip(const char *path)
+{
+	SF_INFO info;
+	SNDFILE *sf;
+	short *frames;
+	size_t n;
+	sf_count_t got;
+	ALuint buffer = 0;
+	ALenum error;
+
+	memset(&info, 0, sizeof info);
+
+	sf = sf_open(path, SFM_READ, &info);
+	if(sf == NULL) {
+		return 0;
+	}
+
+	if(info.frames < 1 || info.channels < 1 || info.samplerate < 1) {
+		sf_close(sf);
+		return 0;
+	}
+
+	n = (size_t)info.frames * (size_t)info.channels;
+	frames = malloc(n * sizeof *frames);
+	if(frames == NULL) {
+		sf_close(sf);
+		return 0;
+	}
+
+	got = sf_readf_short(sf, frames, info.frames);
+	sf_close(sf);
+
+	if(got < 1) {
+		free(frames);
+		return 0;
+	}
+
+	if(info.channels > 1) {
+		sf_count_t i;
+		int c;
+
+		for(i = 0; i < got; i++) {
+			long sum = 0;
+
+			for(c = 0; c < info.channels; c++) {
+				sum += frames[i * info.channels + c];
+			}
+			frames[i] = (short)(sum / info.channels);
+		}
+	}
+
+	alGetError();
+	alGenBuffers(1, &buffer);
+	alBufferData(buffer, AL_FORMAT_MONO16, frames,
+			(ALsizei)(got * sizeof *frames), info.samplerate);
+	free(frames);
+
+	error = alGetError();
+	if(error != AL_NO_ERROR) {
+		if(buffer != 0) {
+			alDeleteBuffers(1, &buffer);
+		}
+		return 0;
+	}
+
+	return buffer;
+}
+
+
+/*
+ * A clip set names its files by scancode and press state.  The extension is
+ * whichever of these it was recorded in; wav first, so that a set holding
+ * both is read the way it always was.
+ */
+
+static const char *const clip_extensions[] = { "wav", "ogg", "opus", "flac" };
+
+static ALuint find_clip(char *path, size_t len, int code, int press)
+{
+	size_t i;
+
+	for(i = 0; i < sizeof clip_extensions / sizeof *clip_extensions; i++) {
+		ALuint buffer;
+
+		snprintf(path, len, "%s/%02x-%d.%s", opt_path_audio, code, press,
+				clip_extensions[i]);
+
+		buffer = load_clip(path);
+		if(buffer != 0) {
+			printd("Loaded \"%s\"", path);
+			return buffer;
+		}
+	}
+
+	return 0;
 }
 
 
@@ -1274,18 +1386,18 @@ int play(int code, int press)
 	if(src[idx] == 0) {
 
 		char fname[256];
-		snprintf(fname, sizeof(fname), "%s/%02x-%d.wav", opt_path_audio, code, press);
 
-		printd("Loading audio file \"%s\"", fname);
+		buf[idx] = find_clip(fname, sizeof fname, code, press);
 
-		buf[idx] = alureCreateBufferFromFile(fname);
 		if(buf[idx] == 0) {
 
 			if(opt_fallback_sound) {
-				snprintf(fname, sizeof(fname), "%s/%02x-%d.wav", opt_path_audio, 0x31, press);
-				buf[idx] = alureCreateBufferFromFile(fname);
+				buf[idx] = find_clip(fname, sizeof fname,
+						0x31, press);
 			} else {
-				fprintf(stderr, "Error opening audio file \"%s\": %s\n", fname, alureGetErrorString());
+				fprintf(stderr, "No clip for %02x-%d in \"%s\": "
+						"%s\n", code, press,
+						opt_path_audio, sf_strerror(NULL));
 			}
 
 			if(buf[idx] == 0) {

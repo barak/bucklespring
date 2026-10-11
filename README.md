@@ -64,7 +64,7 @@ $ make install clean
 To compile on debian-based linux distributions, first make sure the require
 libraries and header files are installed, then simply run `make`:
 
-Every flavour needs OpenAL and alure.  `buckle-x11` needs libX11 and libXtst
+Every flavour needs OpenAL and libsndfile.  `buckle-x11` needs libX11 and libXtst
 on top of that, and `buckle-libinput` needs libinput, libudev and
 libwayland-client.  The system tray icon needs GTK 3 and
 libayatana-appindicator; it is left out when they are missing.  Building from
@@ -74,21 +74,21 @@ pkg-config.
 #### Dependencies on Debian
 ```
 $ sudo apt-get install build-essential autoconf automake pkg-config \
-    libopenal-dev libalure-dev libxtst-dev \
+    libopenal-dev libsndfile1-dev libxtst-dev \
     libinput-dev libudev-dev libwayland-dev \
     libgtk-3-dev libayatana-appindicator3-dev
 ```
 
 #### Dependencies on Arch Linux
 ```
-$ sudo pacman -S base-devel autoconf automake pkgconf openal alure libxtst \
+$ sudo pacman -S base-devel autoconf automake pkgconf openal libsndfile libxtst \
     libinput systemd-libs wayland gtk3 libayatana-appindicator
 ```
 
 #### Dependencies on Fedora Linux
 ```
 $ sudo dnf install gcc autoconf automake pkgconf openal-soft-devel \
-    alure-devel libX11-devel libXtst-devel \
+    libsndfile-devel libX11-devel libXtst-devel \
     libinput-devel systemd-devel wayland-devel \
     gtk3-devel libayatana-appindicator-gtk3-devel
 ```
@@ -214,7 +214,7 @@ I've heard rumours that bucklespring also runs on MacOS. I've been told that
 the following should do:
 
 ```
-$ brew install alure pkg-config autoconf automake
+$ brew install libsndfile pkg-config autoconf automake
 $ git clone https://github.com/zevv/bucklespring.git && cd bucklespring
 $ autoreconf -i
 $ ./configure
@@ -246,11 +246,18 @@ with are the set named `bucklespring`. `--list-clips` says which are
 installed, `--clips=NAME` picks one, and the preferences window has the same
 list and switches between them while running; the samples of the old set are
 dropped and the new ones load as you type. `-p PATH` still points at a
-directory of wav files directly, for a set that is not installed alongside the
+directory of clips directly, for a set that is not installed alongside the
 others.
 
 A set need not cover every key. Where it does not, `-f` falls back to a
 single sample for whatever it is missing.
+
+Clips are read with libsndfile, so a set may be `.wav`, `.ogg`, `.opus` or
+`.flac`; the first of those found for a given key wins, in that order. The
+compressed formats are a good deal smaller, which matters once several sets
+are installed. Anything with more than one channel is mixed down to mono,
+because OpenAL positions only single-channel buffers and the left-to-right
+placement of the keys is most of the point.
 
 Usage
 -----
@@ -278,7 +285,7 @@ Options:
   -l, --list-devices        list available OpenAL audio devices
       --preferences         open the preferences window of the
                             running bucklespring
-  -p, --audio-path=PATH     load .wav files from directory PATH
+  -p, --audio-path=PATH     load clips from the directory PATH
   -r, --no-repeat           stay silent while a held key auto repeats
       --repeat-delay=MS     wait MS before the first repeat, overriding
                             what the compositor or the kernel says
