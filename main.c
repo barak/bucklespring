@@ -456,7 +456,11 @@ static void audio_forget_sources(void)
 
 static int audio_open(const char *name)
 {
-	ALfloat ori[] = { 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f };
+	/* Looking down negative Z with Y up, which is where OpenAL puts a
+	 * listener it has not been told about.  See the note in play() on why
+	 * the sources moved with it. */
+
+	ALfloat ori[] = { 0.0f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f };
 
 	device = alcOpenDevice(name);
 	if(device == NULL) {
@@ -866,9 +870,19 @@ int play(int code, int press)
 		alGenSources((ALuint)1, &src[idx]);
 		TEST_ERROR("source generation");
 
+		/*
+		 * The keyboard sits in front of the listener, to the right for
+		 * a positive find_key_loc().  This used to be written with the
+		 * listener facing backwards, down positive Z, and with the x
+		 * and z of every source negated to match; the two cancelled,
+		 * so it panned correctly and nothing sounded wrong.  Against a
+		 * backwards listener, though, every key was behind the head,
+		 * which only plain panning can be indifferent to.
+		 */
+
 		double x = find_key_loc(code);
 		if (opt_stereo_width > 0) {
-			alSource3f(src[idx], AL_POSITION, -x, 0, (100 - opt_stereo_width) / 100.0);
+			alSource3f(src[idx], AL_POSITION, x, 0, -(100 - opt_stereo_width) / 100.0);
 		}
 		alSourcef(src[idx], AL_GAIN, opt_gain / 100.0);
 
