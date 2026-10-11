@@ -75,7 +75,7 @@ static const char *clip_set_path(const char *name);
 static const char *clip_set_path_quiet(const char *name);
 static void list_clips(void);
 static int compare_names(const void *a, const void *b);
-static void audio_forget_sources(void);
+static void audio_forget_clips(void);
 struct clip;
 static int load_variants(struct clip *c, const char *dir, int code, int press);
 static int fallback_variants(struct clip *c, int code, int press);
@@ -149,6 +149,26 @@ static int muted = 0;
 static pthread_mutex_t audio_lock = PTHREAD_MUTEX_INITIALIZER;
 static ALCdevice *device = NULL;
 static ALCcontext *context = NULL;
+
+/*
+ * The voices.  A source is what OpenAL plays a buffer through, and there is a
+ * fixed budget of them -- 256 in OpenAL Soft -- which this program used to
+ * run out of, exiting with "source generation" a few hundred keys into a
+ * session: it generated a source for every recording it loaded and held it
+ * for as long as the clip stayed cached, which with several recordings to a
+ * key is three or four voices standing idle for every key ever pressed.
+ *
+ * A click lasts about a tenth of a second, so what is wanted is not a voice
+ * per recording but a voice per click still sounding.  These are made once,
+ * with the device, and taken in turn.
+ */
+
+#define SOURCE_COUNT 32
+
+static ALuint sources[SOURCE_COUNT];
+static int source_next;
+
+
 /*
  * One key and press state, with every recording the set offers for it.  A set
  * may hold more than one: vain's have two to four of each, and picking among
@@ -160,7 +180,6 @@ static ALCcontext *context = NULL;
 
 struct clip {
 	ALuint buf[CLIP_VARIANTS];
-	ALuint src[CLIP_VARIANTS];
 	int n;		/* recordings found */
 	int tried;	/* looked for already, so a miss is not looked for again */
 };
@@ -368,7 +387,7 @@ int main(int argc, char **argv)
 	}
 
 	pthread_mutex_lock(&audio_lock);
-	audio_forget_sources();
+	audio_forget_clips();
 	audio_close();
 	pthread_mutex_unlock(&audio_lock);
 
@@ -536,7 +555,7 @@ int buckle_set_clip_set(const char *name)
 	}
 
 	pthread_mutex_lock(&audio_lock);
-	audio_forget_sources();
+	audio_forget_clips();
 	opt_path_audio = path;
 	pthread_mutex_unlock(&audio_lock);
 
@@ -799,17 +818,23 @@ static int fallback_variants(struct clip *c, int code, int press)
 
 /* All three expect audio_lock to be held. */
 
-static void audio_forget_sources(void)
+static void audio_forget_clips(void)
 {
 	size_t i;
+	int v;
+
+	/* A buffer bound to a voice cannot be deleted, and the voices outlive
+	 * the clips, so they are stopped and emptied first. */
+
+	for(v = 0; v < SOURCE_COUNT; v++) {
+		if(sources[v] != 0) {
+			alSourceStop(sources[v]);
+			alSourcei(sources[v], AL_BUFFER, 0);
+		}
+	}
 
 	for(i = 0; i < sizeof clips / sizeof *clips; i++) {
-		int v;
-
 		for(v = 0; v < clips[i].n; v++) {
-			if(clips[i].src[v] != 0) {
-				alDeleteSources(1, &clips[i].src[v]);
-			}
 			if(clips[i].buf[v] != 0) {
 				alDeleteBuffers(1, &clips[i].buf[v]);
 			}
@@ -872,12 +897,31 @@ static int audio_open(const char *name)
 	alListener3f(AL_VELOCITY, 0, 0, 0);
 	alListenerfv(AL_ORIENTATION, ori);
 
+	/* The voices belong to the context, so they are made here and go
+	 * again with it.  Not getting them is this device being no use, and
+	 * is reported as the device not opening. */
+
+	alGetError();
+	alGenSources(SOURCE_COUNT, sources);
+	if(alGetError() != AL_NO_ERROR) {
+		memset(sources, 0, sizeof sources);
+		audio_close();
+		return -1;
+	}
+
+	source_next = 0;
+
 	return 0;
 }
 
 
 static void audio_close(void)
 {
+	if(context != NULL) {
+		alDeleteSources(SOURCE_COUNT, sources);
+		memset(sources, 0, sizeof sources);
+	}
+
 	alcMakeContextCurrent(NULL);
 	if(context != NULL) {
 		alcDestroyContext(context);
@@ -1116,18 +1160,20 @@ int buckle_gain(void)
 
 void buckle_set_gain(int gain)
 {
-	size_t i;
+	int i;
 
 	if(gain < 0) { gain = 0; }
 	if(gain > 100) { gain = 100; }
 
 	pthread_mutex_lock(&audio_lock);
 	opt_gain = gain;
-	for(i = 0; i < sizeof clips / sizeof *clips; i++) {
-		int v;
 
-		for(v = 0; v < clips[i].n; v++) {
-			alSourcef(clips[i].src[v], AL_GAIN, opt_gain / 100.0);
+	/* play() gives a voice its gain along with its buffer, so this is
+	 * only for the clicks still sounding. */
+
+	for(i = 0; i < SOURCE_COUNT; i++) {
+		if(sources[i] != 0) {
+			alSourcef(sources[i], AL_GAIN, opt_gain / 100.0);
 		}
 	}
 	pthread_mutex_unlock(&audio_lock);
@@ -1270,7 +1316,7 @@ int buckle_audio_recover(void)
 
 	pthread_mutex_lock(&audio_lock);
 
-	audio_forget_sources();
+	audio_forget_clips();
 	audio_close();
 
 	if(audio_open(name) == 0) {
@@ -1308,9 +1354,9 @@ const char *buckle_audio_device(void)
 
 
 /*
- * Move to another output device.  The samples are bound to sources which
- * belong to the old context, so they go with it and play() loads them again
- * on demand.  On failure the old device is reopened, as having no device at
+ * Move to another output device.  The buffers and the voices belong to the
+ * old context, so they go with it and play() loads the clips again on
+ * demand.  On failure the old device is reopened, as having no device at
  * all would leave the program running and silent with no way back.
  */
 
@@ -1321,7 +1367,7 @@ int buckle_set_audio_device(const char *name)
 
 	pthread_mutex_lock(&audio_lock);
 
-	audio_forget_sources();
+	audio_forget_clips();
 	audio_close();
 
 	if(audio_open(name) == 0) {
@@ -1349,7 +1395,7 @@ int buckle_mute_keycode(void)
 void buckle_quit(void)
 {
 	pthread_mutex_lock(&audio_lock);
-	audio_forget_sources();
+	audio_forget_clips();
 	audio_close();
 	pthread_mutex_unlock(&audio_lock);
 
@@ -1482,8 +1528,6 @@ int play(int code, int press)
 
 	if(!clip->tried) {
 
-		int v;
-
 		clip->tried = 1;
 
 		if(load_variants(clip, opt_path_audio, code, press) == 0) {
@@ -1501,35 +1545,6 @@ int play(int code, int press)
 					code, press, clip->n);
 		}
 
-		/*
-		 * A source apiece, all placed and gained the same: they are
-		 * recordings of one key, so where it sounds from does not
-		 * depend on which of them is chosen.
-		 *
-		 * The keyboard sits in front of the listener, to the right for
-		 * a positive find_key_loc().  This used to be written with the
-		 * listener facing backwards, down positive Z, and with the x
-		 * and z of every source negated to match; the two cancelled,
-		 * so it panned correctly and nothing sounded wrong.  Against a
-		 * backwards listener, though, every key was behind the head,
-		 * which only plain panning can be indifferent to.
-		 */
-
-		for(v = 0; v < clip->n; v++) {
-			double x = find_key_loc(code);
-
-			alGenSources((ALuint)1, &clip->src[v]);
-			TEST_ERROR("source generation");
-
-			if (opt_stereo_width > 0) {
-				alSource3f(clip->src[v], AL_POSITION, x, 0,
-					-(100 - opt_stereo_width) / 100.0);
-			}
-			alSourcef(clip->src[v], AL_GAIN, opt_gain / 100.0);
-
-			alSourcei(clip->src[v], AL_BUFFER, clip->buf[v]);
-			TEST_ERROR("buffer binding");
-		}
 	}
 
 	if(clip->n < 1) {
@@ -1537,10 +1552,47 @@ int play(int code, int press)
 		return -1;
 	}
 
-	/* One of the recordings, at random where there is a choice. */
+	/*
+	 * One of the recordings, at random where there is a choice, through
+	 * the next voice in turn.  A voice has to be stopped before its
+	 * buffer can be changed, and this one may still be finishing an
+	 * earlier key; taking them in turn makes that a key pressed
+	 * SOURCE_COUNT clicks ago, which at a tenth of a second a click
+	 * would take three hundred keys a second to catch up with.
+	 *
+	 * The keyboard sits in front of the listener, to the right for a
+	 * positive find_key_loc().  This used to be written with the listener
+	 * facing backwards, down positive Z, and with the x and z of every
+	 * source negated to match; the two cancelled, so it panned correctly
+	 * and nothing sounded wrong.  Against a backwards listener, though,
+	 * every key was behind the head, which only plain panning can be
+	 * indifferent to.
+	 *
+	 * A stereo width of zero means no placement at all, which is where a
+	 * source sits before anything is said about it and so where a voice
+	 * used for an earlier key has to be put back.
+	 */
 
 	if (!muted) {
-		alSourcePlay(clip->src[clip->n > 1 ? rand() % clip->n : 0]);
+		ALuint src = sources[source_next];
+		double x = find_key_loc(code);
+
+		source_next = (source_next + 1) % SOURCE_COUNT;
+
+		alSourceStop(src);
+		alSourcei(src, AL_BUFFER,
+				clip->buf[clip->n > 1 ? rand() % clip->n : 0]);
+		TEST_ERROR("buffer binding");
+
+		if (opt_stereo_width > 0) {
+			alSource3f(src, AL_POSITION, x, 0,
+				-(100 - opt_stereo_width) / 100.0);
+		} else {
+			alSource3f(src, AL_POSITION, 0, 0, 0);
+		}
+		alSourcef(src, AL_GAIN, opt_gain / 100.0);
+
+		alSourcePlay(src);
 	}
 	TEST_ERROR("source playing");
 
