@@ -241,11 +241,12 @@ Key clips
 ---------
 
 The samples live in one directory per set, under
-`/usr/share/bucklespring/clips`, and the Model-M recordings this project began
-with are the set named `bucklespring`. `--list-clips` says which are
-installed, `--clips=NAME` picks one, and the preferences window has the same
-list and switches between them while running; the samples of the old set are
-dropped and the new ones load as you type. `-p PATH` still points at a
+`/usr/share/bucklespring/clips`. Two are shipped: `bucklespring`, the Model-M
+recordings this project began with, and `vain-qwertz`, a full QWERTZ layout
+recorded by vain with two to four takes of every key. `--list-clips` says
+which are installed, `--clips=NAME` picks one, and the preferences window has
+the same list and switches between them while running; the samples of the old
+set are dropped and the new ones load as you type. `-p PATH` still points at a
 directory of clips directly, for a set that is not installed alongside the
 others.
 
