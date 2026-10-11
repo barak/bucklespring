@@ -55,7 +55,6 @@
 
 #include "buckle.h"
 
-#define SRC_INVALID INT_MAX
 #define DEFAULT_MUTE_KEYCODE 0x46 /* Scroll Lock */
 #define FALLBACK_KEYCODE 0x31 /* N, the stand-in for an uncovered key */
 
@@ -77,8 +76,9 @@ static const char *clip_set_path_quiet(const char *name);
 static void list_clips(void);
 static int compare_names(const void *a, const void *b);
 static void audio_forget_sources(void);
-static ALuint find_clip(char *path, size_t len, const char *dir,
-		int code, int press);
+struct clip;
+static int load_variants(struct clip *c, const char *dir, int code, int press);
+static int fallback_variants(struct clip *c, int code, int press);
 static ALCenum device_specifier(void);
 static const char *default_device_name(void);
 static int audio_open(const char *name);
@@ -149,8 +149,23 @@ static int muted = 0;
 static pthread_mutex_t audio_lock = PTHREAD_MUTEX_INITIALIZER;
 static ALCdevice *device = NULL;
 static ALCcontext *context = NULL;
-static ALuint buf[512];
-static ALuint src[512];
+/*
+ * One key and press state, with every recording the set offers for it.  A set
+ * may hold more than one: vain's have two to four of each, and picking among
+ * them at random is what keeps a held or repeated key from sounding like a
+ * loop of the same click.
+ */
+
+#define CLIP_VARIANTS 8
+
+struct clip {
+	ALuint buf[CLIP_VARIANTS];
+	ALuint src[CLIP_VARIANTS];
+	int n;		/* recordings found */
+	int tried;	/* looked for already, so a miss is not looked for again */
+};
+
+static struct clip clips[512];
 
 
 /* Options with no short form of their own start past the character codes. */
@@ -292,6 +307,11 @@ int main(int argc, char **argv)
 	if(opt_verbose) {
 		open_console();
 	}
+
+	/* For choosing among a key's recordings; nothing here needs a
+	 * sequence anyone could not guess. */
+
+	srand((unsigned)time(NULL));
 
 	/* Create openal context */
 
@@ -607,7 +627,7 @@ void buckle_audio_devices_free(char **list)
  * anyway, but mixing down is both simpler and what the samples want.
  *
  * libsndfile reads rather more than wav, so a clip set may be ogg, opus or
- * flac instead, at a fraction of the size.  find_clip() picks the extension.
+ * flac instead, at a fraction of the size; load_variants() picks among them.
  */
 
 static ALuint load_clip(const char *path)
@@ -688,29 +708,58 @@ static ALuint load_clip(const char *path)
 
 static const char *const clip_extensions[] = { "flac", "wav", "ogg", "opus" };
 
-static ALuint find_clip(char *path, size_t len, const char *dir,
-		int code, int press)
+/*
+ * Every recording a set offers for one key.  Two namings are understood:
+ * XX-Y.ext for a set with a single clip per key, and XX-Y-Z.ext for the Zth
+ * of several, which is how the sets with more than one are laid out.  The
+ * numbered ones are taken in order and stop at the first gap.
+ */
+
+static int load_variants(struct clip *c, const char *dir, int code, int press)
 {
-	size_t i;
+	char path[512];
+	size_t e;
+	int z;
+
+	c->n = 0;
 
 	if(dir == NULL) {
 		return 0;
 	}
 
-	for(i = 0; i < sizeof clip_extensions / sizeof *clip_extensions; i++) {
-		ALuint buffer;
+	for(e = 0; e < sizeof clip_extensions / sizeof *clip_extensions; e++) {
+		snprintf(path, sizeof path, "%s/%02x-%d.%s", dir, code, press,
+				clip_extensions[e]);
 
-		snprintf(path, len, "%s/%02x-%d.%s", dir, code, press,
-				clip_extensions[i]);
-
-		buffer = load_clip(path);
-		if(buffer != 0) {
+		c->buf[0] = load_clip(path);
+		if(c->buf[0] != 0) {
 			printd("Loaded \"%s\"", path);
-			return buffer;
+			c->n = 1;
+			return c->n;
 		}
 	}
 
-	return 0;
+	for(z = 0; z < CLIP_VARIANTS; z++) {
+		ALuint buffer = 0;
+
+		for(e = 0; e < sizeof clip_extensions / sizeof *clip_extensions &&
+				buffer == 0; e++) {
+			snprintf(path, sizeof path, "%s/%02x-%d-%d.%s", dir,
+					code, press, z, clip_extensions[e]);
+			buffer = load_clip(path);
+			if(buffer != 0) {
+				printd("Loaded \"%s\"", path);
+			}
+		}
+
+		if(buffer == 0) {
+			break;
+		}
+
+		c->buf[c->n++] = buffer;
+	}
+
+	return c->n;
 }
 
 
@@ -725,17 +774,13 @@ static ALuint find_clip(char *path, size_t len, const char *dir,
  *   key even if it is the wrong keyboard;
  *   then that set's generic click, which exists for certain.
  *
- * Without --fallback-sound a key the set does not cover stays silent, as
- * before.
+ * Without --fallback-sound a key the set does not cover stays silent.
  */
 
-static ALuint fallback_clip(char *path, size_t len, int code, int press)
+static int fallback_variants(struct clip *c, int code, int press)
 {
-	ALuint buffer;
-
-	buffer = find_clip(path, len, opt_path_audio, FALLBACK_KEYCODE, press);
-	if(buffer != 0) {
-		return buffer;
+	if(load_variants(c, opt_path_audio, FALLBACK_KEYCODE, press) > 0) {
+		return c->n;
 	}
 
 	/* Nothing further to try when the set in use is the shipped one. */
@@ -744,12 +789,11 @@ static ALuint fallback_clip(char *path, size_t len, int code, int press)
 		return 0;
 	}
 
-	buffer = find_clip(path, len, PATH_AUDIO, code, press);
-	if(buffer != 0) {
-		return buffer;
+	if(load_variants(c, PATH_AUDIO, code, press) > 0) {
+		return c->n;
 	}
 
-	return find_clip(path, len, PATH_AUDIO, FALLBACK_KEYCODE, press);
+	return load_variants(c, PATH_AUDIO, FALLBACK_KEYCODE, press);
 }
 
 
@@ -759,15 +803,19 @@ static void audio_forget_sources(void)
 {
 	size_t i;
 
-	for(i = 0; i < sizeof src / sizeof *src; i++) {
-		if(src[i] != 0 && src[i] != SRC_INVALID) {
-			alDeleteSources(1, &src[i]);
+	for(i = 0; i < sizeof clips / sizeof *clips; i++) {
+		int v;
+
+		for(v = 0; v < clips[i].n; v++) {
+			if(clips[i].src[v] != 0) {
+				alDeleteSources(1, &clips[i].src[v]);
+			}
+			if(clips[i].buf[v] != 0) {
+				alDeleteBuffers(1, &clips[i].buf[v]);
+			}
 		}
-		if(buf[i] != 0) {
-			alDeleteBuffers(1, &buf[i]);
-		}
-		src[i] = 0;
-		buf[i] = 0;
+
+		memset(&clips[i], 0, sizeof clips[i]);
 	}
 }
 
@@ -1075,9 +1123,11 @@ void buckle_set_gain(int gain)
 
 	pthread_mutex_lock(&audio_lock);
 	opt_gain = gain;
-	for(i = 0; i < sizeof src / sizeof *src; i++) {
-		if(src[i] != 0 && src[i] != SRC_INVALID) {
-			alSourcef(src[i], AL_GAIN, opt_gain / 100.0);
+	for(i = 0; i < sizeof clips / sizeof *clips; i++) {
+		int v;
+
+		for(v = 0; v < clips[i].n; v++) {
+			alSourcef(clips[i].src[v], AL_GAIN, opt_gain / 100.0);
 		}
 	}
 	pthread_mutex_unlock(&audio_lock);
@@ -1428,37 +1478,34 @@ int play(int code, int press)
 		handle_mute_key(code == opt_mute_keycode);
 	}
 
-	int idx = code + press * 256;
+	struct clip *clip = &clips[code + press * 256];
 
-	if(src[idx] == 0) {
+	if(!clip->tried) {
 
-		char fname[256];
+		int v;
 
-		buf[idx] = find_clip(fname, sizeof fname, opt_path_audio,
-				code, press);
+		clip->tried = 1;
 
-		if(buf[idx] == 0) {
-
+		if(load_variants(clip, opt_path_audio, code, press) == 0) {
 			if(opt_fallback_sound) {
-				buf[idx] = fallback_clip(fname, sizeof fname,
-						code, press);
+				fallback_variants(clip, code, press);
 			} else {
 				fprintf(stderr, "No clip for %02x-%d in \"%s\"; "
 						"-f borrows one\n", code, press,
 						opt_path_audio);
 			}
-
-			if(buf[idx] == 0) {
-				src[idx] = SRC_INVALID;
-				pthread_mutex_unlock(&audio_lock);
-				return -1;
-			}
 		}
-	
-		alGenSources((ALuint)1, &src[idx]);
-		TEST_ERROR("source generation");
+
+		if(clip->n > 1) {
+			printd("%02x-%d has %d recordings to choose from",
+					code, press, clip->n);
+		}
 
 		/*
+		 * A source apiece, all placed and gained the same: they are
+		 * recordings of one key, so where it sounds from does not
+		 * depend on which of them is chosen.
+		 *
 		 * The keyboard sits in front of the listener, to the right for
 		 * a positive find_key_loc().  This used to be written with the
 		 * listener facing backwards, down positive Z, and with the x
@@ -1468,22 +1515,34 @@ int play(int code, int press)
 		 * which only plain panning can be indifferent to.
 		 */
 
-		double x = find_key_loc(code);
-		if (opt_stereo_width > 0) {
-			alSource3f(src[idx], AL_POSITION, x, 0, -(100 - opt_stereo_width) / 100.0);
+		for(v = 0; v < clip->n; v++) {
+			double x = find_key_loc(code);
+
+			alGenSources((ALuint)1, &clip->src[v]);
+			TEST_ERROR("source generation");
+
+			if (opt_stereo_width > 0) {
+				alSource3f(clip->src[v], AL_POSITION, x, 0,
+					-(100 - opt_stereo_width) / 100.0);
+			}
+			alSourcef(clip->src[v], AL_GAIN, opt_gain / 100.0);
+
+			alSourcei(clip->src[v], AL_BUFFER, clip->buf[v]);
+			TEST_ERROR("buffer binding");
 		}
-		alSourcef(src[idx], AL_GAIN, opt_gain / 100.0);
-
-		alSourcei(src[idx], AL_BUFFER, buf[idx]);
-		TEST_ERROR("buffer binding");
 	}
 
-
-	if(src[idx] != 0 && src[idx] != SRC_INVALID) {
-		if (!muted)
-			alSourcePlay(src[idx]);
-		TEST_ERROR("source playing");
+	if(clip->n < 1) {
+		pthread_mutex_unlock(&audio_lock);
+		return -1;
 	}
+
+	/* One of the recordings, at random where there is a choice. */
+
+	if (!muted) {
+		alSourcePlay(clip->src[clip->n > 1 ? rand() % clip->n : 0]);
+	}
+	TEST_ERROR("source playing");
 
 	pthread_mutex_unlock(&audio_lock);
 

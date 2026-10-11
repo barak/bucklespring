@@ -88,6 +88,11 @@ keyboard; failing that the shipped set's generic click.  Without
 .B \-f
 a key the set does not cover stays silent.
 .PP
+A set may hold more than one recording of the same key, named XX\-Y\-Z with
+Z counting from zero, and one is chosen at random for each press, which keeps
+a held or repeated key from sounding like a loop of a single click.  A set
+with one recording per key names it XX\-Y as before.
+.PP
 Clips are read with
 .BR libsndfile (3),
 so a set may be flac, wav, ogg or opus, the first of those found for a key

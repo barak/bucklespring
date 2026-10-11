@@ -256,6 +256,12 @@ chose; failing that the same key from the set shipped here, which is the
 right key on the wrong keyboard; failing that the shipped set's generic
 click. Without `-f` an uncovered key stays silent.
 
+A set may hold more than one recording of the same key, named
+`XX-Y-Z.ext` with `Z` counting from 0, and one of them is picked at random
+each time the key is pressed. That is what stops a held or repeated key
+sounding like a loop of one click. A set with a single recording per key
+names it `XX-Y.ext` as before.
+
 Clips are read with libsndfile, so a set may be `.flac`, `.wav`, `.ogg` or
 `.opus`; the first of those found for a given key wins, in that order. The set
 shipped here is FLAC, which is lossless and a little under half the size of
