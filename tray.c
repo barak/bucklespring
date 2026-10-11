@@ -57,6 +57,8 @@ static GtkWidget *window;
 static GtkWidget *win_mute;
 static GtkWidget *win_volume;
 static GtkWidget *win_devices;
+static GtkWidget *win_hrtf;
+static GtkWidget *win_hrtf_state;
 
 static void window_sync(void);
 static void window_show(void);
@@ -284,6 +286,28 @@ static void on_win_device(GtkComboBox *combo, gpointer data)
 }
 
 
+/* The three entries go in in the order of the HRTF_* values, so that the row
+ * chosen is the setting asked for. */
+
+_Static_assert(HRTF_AUTO == 0 && HRTF_ON == 1 && HRTF_OFF == 2,
+		"the HRTF combo box is filled in the order of the settings");
+
+static void on_win_hrtf(GtkComboBox *combo, gpointer data)
+{
+	int setting = gtk_combo_box_get_active(combo);
+
+	(void)data;
+
+	if(syncing || setting < 0) {
+		return;
+	}
+	if(buckle_set_hrtf(setting) < 0) {
+		warn_dialog("This OpenAL cannot change its HRTF setting.");
+	}
+	sync_menu();
+}
+
+
 static void on_win_close(GtkButton *button, gpointer data)
 {
 	(void)button;
@@ -358,6 +382,16 @@ static void window_sync(void)
 	gtk_button_set_label(GTK_BUTTON(win_mute), label);
 
 	gtk_range_set_value(GTK_RANGE(win_volume), buckle_gain());
+
+	if(win_hrtf != NULL) {
+		int active = buckle_hrtf_active();
+
+		gtk_combo_box_set_active(GTK_COMBO_BOX(win_hrtf),
+				buckle_hrtf_setting());
+		gtk_label_set_text(GTK_LABEL(win_hrtf_state),
+				active < 0 ? "unavailable" :
+				active ? "in use" : "not in use");
+	}
 
 	syncing = saved;
 }
@@ -435,6 +469,32 @@ static void window_build(void)
 	win_devices = gtk_combo_box_text_new();
 	g_signal_connect(win_devices, "changed", G_CALLBACK(on_win_device), NULL);
 	window_row(grid, row++, "Audio device", win_devices);
+
+	/* Shown whenever there is an --hrtf built in, with what OpenAL
+	 * settled on beside it, and greyed where the device will not do it. */
+
+	if(buckle_hrtf_supported()) {
+		GtkWidget *hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+
+		win_hrtf = gtk_combo_box_text_new();
+		gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(win_hrtf),
+				"Automatic");
+		gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(win_hrtf), "On");
+		gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(win_hrtf), "Off");
+		g_signal_connect(win_hrtf, "changed",
+				G_CALLBACK(on_win_hrtf), NULL);
+		gtk_box_pack_start(GTK_BOX(hbox), win_hrtf, FALSE, FALSE, 0);
+
+		win_hrtf_state = gtk_label_new(NULL);
+		gtk_widget_set_sensitive(win_hrtf_state, FALSE);
+		gtk_box_pack_start(GTK_BOX(hbox), win_hrtf_state, FALSE, FALSE, 0);
+
+		if(buckle_hrtf_active() < 0) {
+			gtk_widget_set_sensitive(win_hrtf, FALSE);
+		}
+
+		window_row(grid, row++, "Headphone 3D", hbox);
+	}
 
 	gtk_box_pack_start(GTK_BOX(box),
 			gtk_separator_new(GTK_ORIENTATION_HORIZONTAL),

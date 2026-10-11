@@ -41,7 +41,15 @@
 #else
 #include <AL/al.h>
 #include <AL/alc.h>
+#include <AL/alext.h>
 #include <AL/alure.h>
+#endif
+
+/* ALC_SOFT_HRTF lives in alext.h, which the OpenAL framework on macOS does
+ * not have.  Without it there is nothing to ask for and --hrtf says so. */
+
+#ifdef ALC_HRTF_SOFT
+#define HAVE_HRTF 1
 #endif
 
 #include "buckle.h"
@@ -61,6 +69,7 @@ static void usage(char *exe, int status);
 static void version(char *exe);
 static void list_devices(void);
 static int parse_mouse(const char *arg);
+static int parse_hrtf(const char *arg);
 static void audio_forget_sources(void);
 static ALCenum device_specifier(void);
 static const char *default_device_name(void);
@@ -113,6 +122,7 @@ static int opt_mute_keycode = DEFAULT_MUTE_KEYCODE;
 static int opt_no_repeat = 0;
 static int opt_mouse = MOUSE_ALL;
 static int opt_no_tray = 0;
+static int opt_hrtf = HRTF_AUTO;
 static int opt_repeat_delay = 0;
 static int opt_repeat_rate = 0;
 static const char *opt_device = NULL;
@@ -140,6 +150,7 @@ enum {
 	OPT_REPEAT_DELAY = 256,
 	OPT_REPEAT_RATE,
 	OPT_NO_TRAY,
+	OPT_HRTF,
 	OPT_PREFERENCES,
 };
 
@@ -159,6 +170,7 @@ static const struct option long_opts[] = {
 	{ "repeat-delay",   required_argument, NULL, OPT_REPEAT_DELAY },
 	{ "repeat-rate",    required_argument, NULL, OPT_REPEAT_RATE },
 	{ "stereo-width",   required_argument, NULL, 's' },
+	{ "hrtf",           optional_argument, NULL, OPT_HRTF },
 	{ "no-tray",        no_argument,       NULL, OPT_NO_TRAY },
 	{ "no-click",       optional_argument, NULL, 'c' },
 	{ "verbose",        no_argument,       NULL, 'v' },
@@ -226,6 +238,9 @@ int main(int argc, char **argv)
 			case 'r':
 				opt_no_repeat = 1;
 				break;
+			case OPT_HRTF:
+				opt_hrtf = parse_hrtf(optarg);
+				break;
 			case OPT_NO_TRAY:
 				opt_no_tray = 1;
 				break;
@@ -284,6 +299,12 @@ int main(int argc, char **argv)
 		opt_path_audio = env_path;
 	}
 
+	printd("HRTF: asked for %s, %s",
+			opt_hrtf == HRTF_ON ? "on" : opt_hrtf == HRTF_OFF ? "off" : "auto",
+			!buckle_hrtf_supported() ? "not built in" :
+			buckle_hrtf_active() < 0 ? "not offered by this device" :
+			buckle_hrtf_active() ? "in use" : "not in use");
+
 	printd("Using wav dir: \"%s\"\n", opt_path_audio);
 
 #ifdef HAVE_TRAY
@@ -337,6 +358,9 @@ static void usage(char *exe, int status)
 		"  -d, --device=DEVICE       use OpenAL audio device DEVICE\n"
 		"  -f, --fallback-sound      use a fallback sound for unknown keys\n"
 		"  -g, --gain=GAIN           set playback gain [0..100]\n"
+		"      --hrtf[=WHEN]         filter for headphones, so that keys sound\n"
+		"                            placed around you rather than panned: on,\n"
+		"                            off, or auto to leave it to OpenAL\n"
 		"  -m, --mute-keycode=CODE   use CODE as mute key (default 0x46 for scroll lock)\n"
 		"  -M, --mute                start the program muted\n"
 		"  -c, --no-click[=LIST]     don't play a sound on mouse click; LIST\n"
@@ -477,6 +501,29 @@ static void audio_forget_sources(void)
 }
 
 
+/* The attribute list for a context or a device reset, or NULL when there is
+ * nothing to say and OpenAL's own setting should stand. */
+
+static ALCint *hrtf_attrs(int setting, ALCint *buf)
+{
+#ifdef HAVE_HRTF
+	if(setting == HRTF_AUTO) {
+		return NULL;
+	}
+
+	buf[0] = ALC_HRTF_SOFT;
+	buf[1] = setting == HRTF_ON ? ALC_TRUE : ALC_FALSE;
+	buf[2] = 0;
+
+	return buf;
+#else
+	(void)setting;
+	(void)buf;
+	return NULL;
+#endif
+}
+
+
 static int audio_open(const char *name)
 {
 	/* Looking down negative Z with Y up, which is where OpenAL puts a
@@ -484,13 +531,14 @@ static int audio_open(const char *name)
 	 * the sources moved with it. */
 
 	ALfloat ori[] = { 0.0f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f };
+	ALCint attrs[3];
 
 	device = alcOpenDevice(name);
 	if(device == NULL) {
 		return -1;
 	}
 
-	context = alcCreateContext(device, NULL);
+	context = alcCreateContext(device, hrtf_attrs(opt_hrtf, attrs));
 	if(context == NULL || !alcMakeContextCurrent(context)) {
 		if(context != NULL) {
 			alcDestroyContext(context);
@@ -607,6 +655,27 @@ static int parse_mouse(const char *arg)
 }
 
 
+/* The argument of --hrtf.  Bare --hrtf means on, as asking for it at all is
+ * unlikely to mean "whatever you were going to do anyway". */
+
+static int parse_hrtf(const char *arg)
+{
+	if(arg == NULL || strcmp(arg, "on") == 0 || strcmp(arg, "yes") == 0) {
+		return HRTF_ON;
+	}
+	if(strcmp(arg, "off") == 0 || strcmp(arg, "no") == 0) {
+		return HRTF_OFF;
+	}
+	if(strcmp(arg, "auto") == 0) {
+		return HRTF_AUTO;
+	}
+
+	fprintf(stderr, "Unknown --hrtf setting \"%s\"; expected on, off or auto\n",
+			arg);
+	exit(1);
+}
+
+
 /*
  * Is this one of the mouse events the user left enabled?  Asked by both
  * backends, which name the same events by different numbers.  Doing it here
@@ -684,6 +753,99 @@ void buckle_set_gain(int gain)
  * buffer because the string belongs to the device and would dangle the moment
  * one is closed; only the tray calls this, and only from the GTK thread.
  */
+
+/*
+ * HRTF, the filter pair that makes a positioned source sound placed around
+ * the listener rather than panned between the ears.  It is worth having on
+ * headphones and wrong on speakers, so the default is to leave the choice to
+ * OpenAL, which turns it on when it believes it is talking to headphones.
+ */
+
+/* Whether there is an --hrtf to speak of at all, which is a question about
+ * how this was built rather than about the device in front of us. */
+
+int buckle_hrtf_supported(void)
+{
+#ifdef HAVE_HRTF
+	return 1;
+#else
+	return 0;
+#endif
+}
+
+
+int buckle_hrtf_setting(void)
+{
+	return opt_hrtf;
+}
+
+
+/* What OpenAL is actually doing, which need not be what was asked for: -1
+ * when there is no telling. */
+
+int buckle_hrtf_active(void)
+{
+#ifdef HAVE_HRTF
+	ALCint state = -1;
+
+	pthread_mutex_lock(&audio_lock);
+	if(device != NULL && alcIsExtensionPresent(device, "ALC_SOFT_HRTF")) {
+		alcGetIntegerv(device, ALC_HRTF_SOFT, 1, &state);
+	}
+	pthread_mutex_unlock(&audio_lock);
+
+	return state;
+#else
+	return -1;
+#endif
+}
+
+
+/*
+ * Switching it over while running is a device reset rather than a reopen, so
+ * the sources and the samples already loaded into them survive it.
+ */
+
+int buckle_set_hrtf(int setting)
+{
+#ifdef HAVE_HRTF
+	ALCint attrs[3];
+	ALCint *attrp;
+	LPALCRESETDEVICESOFT reset;
+	int ok = 0;
+
+	pthread_mutex_lock(&audio_lock);
+
+	reset = (LPALCRESETDEVICESOFT)
+			alcGetProcAddress(device, "alcResetDeviceSOFT");
+
+	if(device != NULL && reset != NULL) {
+
+		/* A reset wants to be told either way; leaving the attribute
+		 * out here would keep whatever the last reset asked for. */
+
+		attrs[0] = ALC_HRTF_SOFT;
+		attrs[1] = setting == HRTF_ON ? ALC_TRUE
+			 : setting == HRTF_OFF ? ALC_FALSE
+			 : ALC_DONT_CARE_SOFT;
+		attrs[2] = 0;
+		attrp = attrs;
+
+		ok = reset(device, attrp);
+		if(ok) {
+			opt_hrtf = setting;
+		}
+	}
+
+	pthread_mutex_unlock(&audio_lock);
+
+	return ok ? 0 : -1;
+#else
+	(void)setting;
+	return -1;
+#endif
+}
+
 
 const char *buckle_audio_device(void)
 {

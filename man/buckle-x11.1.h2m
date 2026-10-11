@@ -40,12 +40,12 @@ leaves the icon out.  It is a StatusNotifierItem, which KDE Plasma shows as it
 is and GNOME Shell shows through an extension; where nothing is listening
 there is simply no icon and nothing else changes.
 .PP
-The volume and the audio device are in that window, and not in the menu: a
-menu on a tray icon travels over dbusmenu, which carries labels and check
-marks rather than widgets, so a volume there can only be a ladder of radio
-items and a device list has to be rebuilt as a submenu whenever it changes.
-It also means a desktop with nowhere to put the icon still has all of it.
-The running
+The volume, the audio device and the headphone filter are in that window, and
+not in the menu: a menu on a tray icon travels over dbusmenu, which carries
+labels and check marks rather than widgets, so a volume there can only be a
+ladder of radio items and a device list has to be rebuilt as a submenu
+whenever it changes.  It also means a desktop with nowhere to put the icon
+still has all of it.  The running
 .B buckle\-x11
 puts the window up when it is asked:
 .B \-\-preferences
@@ -57,6 +57,19 @@ and
 .B SIGUSR1
 does it too, for a keyboard shortcut with no dbus tooling in it.  Closing the
 window leaves the clicks running.
+
+Each key is played at a position of its own, left to right as it sits on the
+board, which
+.B \-\-stereo\-width
+scales.  On headphones
+.B \-\-hrtf
+runs that through OpenAL's head related transfer functions, which is the
+difference between a key sounding placed somewhere around you and merely
+panned between your ears.  OpenAL left to itself does this only when it
+believes it is talking to headphones, and
+.B \-\-hrtf=auto
+is that default; the preferences window offers the same three choices while
+running.
 
 [SEE ALSO]
 .BR buckle\-x11.service (8),

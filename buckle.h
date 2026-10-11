@@ -23,6 +23,17 @@ int play(int code, int press);
 
 int mouse_enabled(int which);
 
+/* What --hrtf was set to, and what the tray can set it to. */
+
+#define HRTF_AUTO	0
+#define HRTF_ON		1
+#define HRTF_OFF	2
+
+int buckle_hrtf_supported(void);
+int buckle_hrtf_setting(void);
+int buckle_hrtf_active(void);
+int buckle_set_hrtf(int setting);
+
 /* What the tray drives the program through; all of it is thread safe. */
 
 int buckle_muted(void);

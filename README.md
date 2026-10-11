@@ -162,13 +162,13 @@ on regardless, as it does on a console where there is no display at all.
 
 #### The preferences window
 
-The volume and the audio device live here rather than in the menu.  A menu on
-a tray icon travels over dbusmenu, which carries labels and check marks rather
-than widgets: a volume there can only be a ladder of radio items, a device
-list has to be rebuilt as a submenu every time it changes, and the panel, not
-the program, decides when the menu closes.  A window has a slider and a combo
-box and none of that.  It also means that a desktop with nothing listening for
-the icon still has all of it.
+The volume, the audio device and the headphone filter live here rather than in
+the menu.  A menu on a tray icon travels over dbusmenu, which carries labels
+and check marks rather than widgets: a volume there can only be a ladder of
+radio items, a device list has to be rebuilt as a submenu every time it
+changes, and the panel, not the program, decides when the menu closes.  A
+window has a slider and a combo box and none of that.  It also means that a
+desktop with nothing listening for the icon still has all of it.
 
 The running buckle puts the window up when asked:
 
@@ -248,6 +248,9 @@ Options:
   -d, --device=DEVICE       use OpenAL audio device DEVICE
   -f, --fallback-sound      use a fallback sound for unknown keys
   -g, --gain=GAIN           set playback gain [0..100]
+      --hrtf[=WHEN]         filter for headphones, so that keys sound
+                            placed around you rather than panned: on,
+                            off, or auto to leave it to OpenAL
   -m, --mute-keycode=CODE   use CODE as mute key (default 0x46 for scroll lock)
   -M, --mute                start the program muted
   -c, --no-click[=LIST]     don't play a sound on mouse click; LIST
@@ -293,8 +296,13 @@ properly tuning OpenAL for bucklespring.
  periods = 4
  ````
 
-* If you are using headphones, enabling the head-related-transfer functions in OpenAL
-  for a better 3D sound:
+* If you are using headphones, `--hrtf` applies OpenAL's head-related transfer
+  functions, so that each key sounds placed around you rather than panned
+  between the ears. Left to itself OpenAL turns this on only when it believes
+  it is talking to headphones, which is what `--hrtf=auto`, the default,
+  leaves it to do; `--hrtf=off` refuses it even then. The preferences window
+  has the same three choices and switches between them while running. To
+  enable it for every OpenAL application rather than just this one:
 
  ````
  hrtf = true
