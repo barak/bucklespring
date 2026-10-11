@@ -847,6 +847,60 @@ int buckle_set_hrtf(int setting)
 }
 
 
+/*
+ * Whether the device we are playing to is still there: 1 yes, 0 gone, -1 if
+ * this OpenAL will not say.  A bluetooth headset going out of range is the
+ * usual way for it to turn 0.
+ */
+
+int buckle_audio_connected(void)
+{
+#ifdef ALC_EXT_disconnect
+	ALCint state = -1;
+
+	pthread_mutex_lock(&audio_lock);
+	if(device != NULL && alcIsExtensionPresent(device, "ALC_EXT_disconnect")) {
+		alcGetIntegerv(device, ALC_CONNECTED, 1, &state);
+	}
+	pthread_mutex_unlock(&audio_lock);
+
+	return state;
+#else
+	return -1;
+#endif
+}
+
+
+/*
+ * Move to whatever the default device is now, for when the one in use has
+ * gone.  Without this a headset disconnecting leaves the program running and
+ * silent until it is restarted.  Returns 1 if it moved.
+ */
+
+int buckle_audio_recover(void)
+{
+	const char *name = default_device_name();
+
+	pthread_mutex_lock(&audio_lock);
+
+	audio_forget_sources();
+	audio_close();
+
+	if(audio_open(name) == 0) {
+		opt_device = name;
+		pthread_mutex_unlock(&audio_lock);
+		printd("Audio device went away; moved to \"%s\"", name);
+		return 1;
+	}
+
+	pthread_mutex_unlock(&audio_lock);
+	fprintf(stderr, "The audio device went away and \"%s\" could not be "
+			"opened in its place\n", name != NULL ? name : "(default)");
+
+	return 0;
+}
+
+
 const char *buckle_audio_device(void)
 {
 	static char name[256];
@@ -1019,6 +1073,17 @@ int play(int code, int press)
 	printd("scancode %d/0x%x", code, code);
 
 	pthread_mutex_lock(&audio_lock);
+
+	/*
+	 * No device means a switch or a recovery could not get one, and every
+	 * al* call below would fail with no context current.  TEST_ERROR ends
+	 * the process on those, so silence is the right answer here.
+	 */
+
+	if(device == NULL) {
+		pthread_mutex_unlock(&audio_lock);
+		return -1;
+	}
 
 	/* Check for mute sequence: ScrollLock down+up+down */
 

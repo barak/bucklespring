@@ -48,6 +48,15 @@
 static GtkWidget *item_mute;
 
 /*
+ * The output devices come and go while we run: a headset is plugged in, a
+ * bluetooth one wanders out of range.  Re-asking ALC picks that up without
+ * reopening anything, so the combo box is refilled whenever the list has
+ * actually changed, and device_names is what it currently shows.
+ */
+
+static char **device_names = NULL;
+
+/*
  * The controls window: built the first time it is asked for, and from then on
  * kept and hidden rather than destroyed, so that it comes back where the user
  * left it.  window_show() says why it exists at all.
@@ -241,6 +250,70 @@ static void menu_separator(GtkWidget *menu)
 }
 
 
+/* Refilling a combo box resets what it has selected, so it is done only when
+ * ALC has come back with a list that really is different. */
+
+static int devices_differ(char **new)
+{
+	size_t i;
+
+	if(device_names == NULL) {
+		return 1;
+	}
+
+	for(i = 0; ; i++) {
+		if(device_names[i] == NULL && new[i] == NULL) {
+			return 0;
+		}
+		if(device_names[i] == NULL || new[i] == NULL) {
+			return 1;
+		}
+		if(g_strcmp0(device_names[i], new[i]) != 0) {
+			return 1;
+		}
+	}
+}
+
+
+static void sync_devices(void)
+{
+	char **list = buckle_audio_devices();
+
+	if(list != NULL && devices_differ(list)) {
+		buckle_audio_devices_free(device_names);
+		device_names = list;
+		window_refill_devices();
+	} else {
+		buckle_audio_devices_free(list);
+	}
+}
+
+
+static gboolean on_device_tick(gpointer data)
+{
+	(void)data;
+
+	/* The device in use going away takes the sound with it, and no list
+	 * will bring it back; move to whatever the default is now.  That has
+	 * to go on whether or not anybody is looking. */
+
+	if(buckle_audio_connected() == 0) {
+		buckle_audio_recover();
+	}
+
+	/* The list behind the combo box is another matter: asking ALC for it
+	 * is a round trip to the sound server, and nothing shows it unless
+	 * the window is up.
+	 */
+
+	if(window != NULL && gtk_widget_get_visible(window)) {
+		sync_devices();
+	}
+
+	return G_SOURCE_CONTINUE;
+}
+
+
 /*
  * The controls, which share one guard: setting a widget to what the program
  * already thinks must not read back as the user asking for it.
@@ -353,16 +426,10 @@ static void window_fill_combo(GtkWidget *combo, char **list,
 
 static void window_refill_devices(void)
 {
-	char **list;
-
-	if(window == NULL) {
-		return;
+	if(window != NULL) {
+		window_fill_combo(win_devices, device_names,
+				buckle_audio_device(), "(none found)");
 	}
-
-	list = buckle_audio_devices();
-	window_fill_combo(win_devices, list, buckle_audio_device(),
-			"(none found)");
-	buckle_audio_devices_free(list);
 }
 
 
@@ -531,9 +598,10 @@ static void window_show(void)
 		window_build();
 	}
 
-	/* Nothing asks ALC while the window is down, so the list is read
-	 * again every time it goes up. */
+	/* Nothing asks ALC while the window is down, so the list may be
+	 * stale, or, the first time, empty. */
 
+	sync_devices();
 	window_refill_devices();
 
 	window_sync();
@@ -798,6 +866,11 @@ int tray_init(void)
 
 	sync_menu();
 	g_timeout_add(500, on_tick, NULL);
+
+	/* Recovering a vanished audio device, and the two lists while the
+	 * window is up; both slower than the menu's own label. */
+
+	g_timeout_add_seconds(2, on_device_tick, NULL);
 
 	return 1;
 }

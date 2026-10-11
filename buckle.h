@@ -43,6 +43,8 @@ void buckle_set_gain(int gain);
 int buckle_mute_keycode(void);
 const char *buckle_audio_device(void);
 int buckle_set_audio_device(const char *name);
+int buckle_audio_connected(void);
+int buckle_audio_recover(void);
 char **buckle_audio_devices(void);
 void buckle_audio_devices_free(char **list);
 void buckle_quit(void);
