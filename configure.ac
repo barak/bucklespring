@@ -1,4 +1,4 @@
-AC_INIT([bucklespring],[1.5.2~dev],[https://github.com/barak/bucklespring/issues],
+AC_INIT([bucklespring],[2.0.0],[https://github.com/barak/bucklespring/issues],
         [bucklespring],[https://github.com/barak/bucklespring])
 
 AC_CONFIG_SRCDIR([main.c])
