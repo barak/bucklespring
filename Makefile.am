@@ -157,6 +157,10 @@ EXTRA_DIST = README.md LICENSE \
 DEFAULT_CLIPS = bucklespring
 clipsdir = $(pkgdatadir)/clips
 
+beeperclipsdir = $(clipsdir)/beeper
+dist_beeperclips_DATA = \
+	clips/beeper/31-1.flac
+
 sequentialclipsdir = $(clipsdir)/sequential
 dist_sequentialclips_DATA = \
 	clips/sequential/01-0-0.flac \
