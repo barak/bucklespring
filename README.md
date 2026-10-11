@@ -241,14 +241,11 @@ Key clips
 ---------
 
 The samples live in one directory per set, under
-`/usr/share/bucklespring/clips`. Two are shipped: `bucklespring`, the Model-M
-recordings this project began with, and `vain-qwertz`, a full QWERTZ layout
-recorded by vain with two to four takes of every key. `--list-clips` says
-which are installed, `--clips=NAME` picks one, and the preferences window has
-the same list and switches between them while running; the samples of the old
-set are dropped and the new ones load as you type. `-p PATH` still points at a
-directory of clips directly, for a set that is not installed alongside the
-others.
+`/usr/share/bucklespring/clips`. `--list-clips` says which are installed,
+`--clips=NAME` picks one, and the preferences window has the same list and
+switches between them while running; the samples of the old set are dropped
+and the new ones load as you type. `-p PATH` still points at a directory of
+clips directly, for a set that is not installed alongside the others.
 
 A set need not cover every key — several of the ones people have recorded
 cover only the letters. Where it does not, `-f` borrows a clip, nearest
@@ -256,6 +253,19 @@ first: the set's own generic click, so it still sounds like the set you
 chose; failing that the same key from the set shipped here, which is the
 right key on the wrong keyboard; failing that the shipped set's generic
 click. Without `-f` an uncovered key stays silent.
+
+### The sets shipped here
+
+| Set | Recorded by | Contents |
+| --- | --- | --- |
+| `bucklespring` | Ico Doornekamp | the IBM Model M recordings this project began with, one take per key |
+| `vain-qwertz` | vain | a full QWERTZ layout, two to four takes of every key; from upstream's `samplesets` branch |
+| `sequential` | SequentialDesign | a keyboard with two to four takes of every key |
+| `beeper` | mejs | one beep, for a Model M whose PC speaker is wired up; press only, needs `-f` |
+
+All of them are under the GNU GPL version 2 or later, like the rest of the
+project: the first two were contributed to it directly, and the last two were
+added on forks of it by their authors, who stated no other terms.
 
 A set may hold more than one recording of the same key, named
 `XX-Y-Z.ext` with `Z` counting from 0, and one of them is picked at random
