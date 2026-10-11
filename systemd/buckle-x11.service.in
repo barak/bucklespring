@@ -17,6 +17,12 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
+# ProtectSystem=strict makes everything read-only, the user's own runtime
+# directory included, and GTK wants to write a dconf cache into it.  Without
+# this the journal collects a hundred "dconf will not work properly" lines
+# every time the service starts.  It is the user's own directory, so handing
+# it back costs none of the protection that line is there for.
+ReadWritePaths=%t
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
