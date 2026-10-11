@@ -79,9 +79,14 @@ it runs, dropping the samples of the old set so that the new ones load as you
 type.
 .B \-p
 still names a directory of wav files directly, for a set kept somewhere of
-its own.  A set that does not cover every key wants
+its own.  A set need not cover the whole keyboard, and
 .B \-f
-alongside it.
+then borrows a clip for the rest, nearest first: the set's own generic click,
+so that it still sounds like the set that was chosen; failing that the same
+key from the set shipped with the program, the right key on the wrong
+keyboard; failing that the shipped set's generic click.  Without
+.B \-f
+a key the set does not cover stays silent.
 .PP
 Clips are read with
 .BR libsndfile (3),

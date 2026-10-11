@@ -249,8 +249,12 @@ dropped and the new ones load as you type. `-p PATH` still points at a
 directory of clips directly, for a set that is not installed alongside the
 others.
 
-A set need not cover every key. Where it does not, `-f` falls back to a
-single sample for whatever it is missing.
+A set need not cover every key — several of the ones people have recorded
+cover only the letters. Where it does not, `-f` borrows a clip, nearest
+first: the set's own generic click, so it still sounds like the set you
+chose; failing that the same key from the set shipped here, which is the
+right key on the wrong keyboard; failing that the shipped set's generic
+click. Without `-f` an uncovered key stays silent.
 
 Clips are read with libsndfile, so a set may be `.flac`, `.wav`, `.ogg` or
 `.opus`; the first of those found for a given key wins, in that order. The set

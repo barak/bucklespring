@@ -57,6 +57,7 @@
 
 #define SRC_INVALID INT_MAX
 #define DEFAULT_MUTE_KEYCODE 0x46 /* Scroll Lock */
+#define FALLBACK_KEYCODE 0x31 /* N, the stand-in for an uncovered key */
 
 #define TEST_ERROR(_msg)		\
 	error = alGetError();		\
@@ -76,7 +77,8 @@ static const char *clip_set_path_quiet(const char *name);
 static void list_clips(void);
 static int compare_names(const void *a, const void *b);
 static void audio_forget_sources(void);
-static ALuint find_clip(char *path, size_t len, int code, int press);
+static ALuint find_clip(char *path, size_t len, const char *dir,
+		int code, int press);
 static ALCenum device_specifier(void);
 static const char *default_device_name(void);
 static int audio_open(const char *name);
@@ -686,14 +688,19 @@ static ALuint load_clip(const char *path)
 
 static const char *const clip_extensions[] = { "flac", "wav", "ogg", "opus" };
 
-static ALuint find_clip(char *path, size_t len, int code, int press)
+static ALuint find_clip(char *path, size_t len, const char *dir,
+		int code, int press)
 {
 	size_t i;
+
+	if(dir == NULL) {
+		return 0;
+	}
 
 	for(i = 0; i < sizeof clip_extensions / sizeof *clip_extensions; i++) {
 		ALuint buffer;
 
-		snprintf(path, len, "%s/%02x-%d.%s", opt_path_audio, code, press,
+		snprintf(path, len, "%s/%02x-%d.%s", dir, code, press,
 				clip_extensions[i]);
 
 		buffer = load_clip(path);
@@ -704,6 +711,45 @@ static ALuint find_clip(char *path, size_t len, int code, int press)
 	}
 
 	return 0;
+}
+
+
+/*
+ * What to play when the chosen set has nothing for this key.  A set need not
+ * cover the whole keyboard -- several of the ones people have recorded cover
+ * only the letters -- so --fallback-sound works down a list, nearest first:
+ *
+ *   the set's own generic click, keeping whatever the set sounds like, which
+ *   is the reason for choosing it;
+ *   then this key from the set shipped with the program, which is the right
+ *   key even if it is the wrong keyboard;
+ *   then that set's generic click, which exists for certain.
+ *
+ * Without --fallback-sound a key the set does not cover stays silent, as
+ * before.
+ */
+
+static ALuint fallback_clip(char *path, size_t len, int code, int press)
+{
+	ALuint buffer;
+
+	buffer = find_clip(path, len, opt_path_audio, FALLBACK_KEYCODE, press);
+	if(buffer != 0) {
+		return buffer;
+	}
+
+	/* Nothing further to try when the set in use is the shipped one. */
+
+	if(opt_path_audio != NULL && strcmp(opt_path_audio, PATH_AUDIO) == 0) {
+		return 0;
+	}
+
+	buffer = find_clip(path, len, PATH_AUDIO, code, press);
+	if(buffer != 0) {
+		return buffer;
+	}
+
+	return find_clip(path, len, PATH_AUDIO, FALLBACK_KEYCODE, press);
 }
 
 
@@ -1388,17 +1434,18 @@ int play(int code, int press)
 
 		char fname[256];
 
-		buf[idx] = find_clip(fname, sizeof fname, code, press);
+		buf[idx] = find_clip(fname, sizeof fname, opt_path_audio,
+				code, press);
 
 		if(buf[idx] == 0) {
 
 			if(opt_fallback_sound) {
-				buf[idx] = find_clip(fname, sizeof fname,
-						0x31, press);
+				buf[idx] = fallback_clip(fname, sizeof fname,
+						code, press);
 			} else {
-				fprintf(stderr, "No clip for %02x-%d in \"%s\": "
-						"%s\n", code, press,
-						opt_path_audio, sf_strerror(NULL));
+				fprintf(stderr, "No clip for %02x-%d in \"%s\"; "
+						"-f borrows one\n", code, press,
+						opt_path_audio);
 			}
 
 			if(buf[idx] == 0) {
