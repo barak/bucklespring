@@ -89,10 +89,11 @@ alongside it.
 .PP
 Clips are read with
 .BR libsndfile (3),
-so a set may be wav, ogg, opus or flac, the first of those found for a key
-winning in that order; the compressed ones are much the smaller once several
-sets are installed.  Anything with more than one channel is mixed down to
-mono, OpenAL positioning only single channel buffers.
+so a set may be flac, wav, ogg or opus, the first of those found for a key
+winning in that order.  The set shipped with the program is flac, lossless
+and a little under half the size of the same samples as wav; ogg and opus are
+smaller again at the cost of being lossy.  Anything with more than one channel
+is mixed down to mono, OpenAL positioning only single channel buffers.
 
 [SEE ALSO]
 .BR buckle\-x11.service (8),

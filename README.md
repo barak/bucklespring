@@ -252,12 +252,13 @@ others.
 A set need not cover every key. Where it does not, `-f` falls back to a
 single sample for whatever it is missing.
 
-Clips are read with libsndfile, so a set may be `.wav`, `.ogg`, `.opus` or
-`.flac`; the first of those found for a given key wins, in that order. The
-compressed formats are a good deal smaller, which matters once several sets
-are installed. Anything with more than one channel is mixed down to mono,
-because OpenAL positions only single-channel buffers and the left-to-right
-placement of the keys is most of the point.
+Clips are read with libsndfile, so a set may be `.flac`, `.wav`, `.ogg` or
+`.opus`; the first of those found for a given key wins, in that order. The set
+shipped here is FLAC, which is lossless and a little under half the size of
+the same samples as wav; `.ogg` and `.opus` are lossy but smaller again, which
+may be worth it once several sets are installed. Anything with more than one
+channel is mixed down to mono, because OpenAL positions only single-channel
+buffers and the left-to-right placement of the keys is most of the point.
 
 Usage
 -----

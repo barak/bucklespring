@@ -678,12 +678,13 @@ static ALuint load_clip(const char *path)
 
 
 /*
- * A clip set names its files by scancode and press state.  The extension is
- * whichever of these it was recorded in; wav first, so that a set holding
- * both is read the way it always was.
+ * A clip set names its files by scancode and press state; the extension is
+ * whichever libsndfile format it was stored in.  Lossless first, so that a
+ * set holding a key in both forms is heard at its best, and because the set
+ * shipped here is flac.
  */
 
-static const char *const clip_extensions[] = { "wav", "ogg", "opus", "flac" };
+static const char *const clip_extensions[] = { "flac", "wav", "ogg", "opus" };
 
 static ALuint find_clip(char *path, size_t len, int code, int press)
 {
