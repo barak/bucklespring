@@ -16,6 +16,8 @@ bucklespring (2.0.0-1) UNRELEASED; urgency=medium
   * Drop debian/patches/0001-version.patch, unnecessary.
   * debian/copyright, updated for new keyboard sound sets.
   * Bump to debhelper compat level 14.
+  * Updated German debconf translation by Helge Kreutzmann
+    (closes: #1150643)
 
  -- Barak A. Pearlmutter <bap@debian.org>  Sun, 11 Oct 2026 17:09:08 +0100
 
