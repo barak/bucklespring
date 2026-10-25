@@ -6,7 +6,7 @@ AM_CFLAGS = -Wall
 buckle_cppflags = -DPATH_AUDIO='"$(wavdir)"'
 
 bin_PROGRAMS =
-check_PROGRAMS =
+check_PROGRAMS = test-audio
 TESTS = $(check_PROGRAMS)
 dist_man1_MANS =
 dist_man8_MANS =
@@ -23,6 +23,11 @@ else
 tray_cflags =
 tray_libs =
 endif
+
+test_audio_SOURCES = tests/test-audio.c
+test_audio_CPPFLAGS = $(buckle_cppflags)
+test_audio_CFLAGS = $(AM_CFLAGS) $(AUDIO_CFLAGS) $(PTHREAD_CFLAGS)
+test_audio_LDADD = $(AUDIO_LIBS)
 
 buckle_x11_SOURCES = main.c buckle.h scan-x11.c
 buckle_x11_CPPFLAGS = $(buckle_cppflags)
