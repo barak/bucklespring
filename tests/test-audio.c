@@ -12,6 +12,9 @@ static int loads;
 static int sources;
 static int plays;
 static int deleted_buffers;
+static int listener_gain_changes;
+static int source_gain_changes;
+static ALfloat listener_gain;
 static ALuint bound[512];
 
 static int test_access(const char *path, int mode)
@@ -38,7 +41,19 @@ void AL_APIENTRY alGenSources(ALsizei n, ALuint *out)
 
 void AL_APIENTRY alSource3f(ALuint source, ALenum param,
 		ALfloat x, ALfloat y, ALfloat z) {}
-void AL_APIENTRY alSourcef(ALuint source, ALenum param, ALfloat value) {}
+
+void AL_APIENTRY alSourcef(ALuint source, ALenum param, ALfloat value)
+{
+	assert(param == AL_GAIN);
+	source_gain_changes++;
+}
+
+void AL_APIENTRY alListenerf(ALenum param, ALfloat value)
+{
+	assert(param == AL_GAIN);
+	listener_gain = value;
+	listener_gain_changes++;
+}
 
 void AL_APIENTRY alSourcei(ALuint source, ALenum param, ALint value)
 {
@@ -90,6 +105,18 @@ int main(void)
 	assert(play(3, 1) == 0 && bound[src[0x103]] == buf[0x131]);
 	assert(play(0x31, 1) == 0);
 	assert(loads == 3 && sources == 4 && plays == 5);
+
+	context = (ALCcontext *)&loads;
+	buckle_set_gain(50);
+	assert(listener_gain == 0.5f && listener_gain_changes == 1);
+	assert(opt_gain == 50 && source_gain_changes == 0);
+	buckle_set_gain(150);
+	assert(listener_gain == 1.0f && opt_gain == 100);
+	buckle_set_gain(-1);
+	assert(listener_gain == 0.0f && opt_gain == 0);
+	context = NULL;
+	buckle_set_gain(100);
+	assert(listener_gain_changes == 3 && opt_gain == 100);
 
 	audio_forget_sources();
 	assert(deleted_buffers == 3);
