@@ -10,6 +10,7 @@ static int queued;
 static int played;
 static int destroyed;
 static int suspended;
+static int compositor_period_ms = REPEAT_PERIOD_MS;
 static char event;
 static char keyboard_event;
 static enum libinput_event_type event_type = LIBINPUT_EVENT_KEYBOARD_KEY;
@@ -70,7 +71,11 @@ void repeat_override(int *delay, int *period) {}
 void printd(const char *fmt, ...) {}
 int wl_repeat_open(void) { return -1; }
 int wl_repeat_dispatch(void) { return 0; }
-int wl_repeat_get(int *delay, int *period) { return 0; }
+int wl_repeat_get(int *delay, int *period)
+{
+	*period = compositor_period_ms;
+	return 1;
+}
 
 int main(void)
 {
@@ -142,5 +147,21 @@ int main(void)
 	assert(handle_events(NULL, "test-session", 42) == 0);
 	assert(session_checks == checks && destroyed == before + 2);
 	assert(played == 2);
+
+	poll_error = 0;
+	repeat_key = KEY_A;
+	repeat_after(0);
+	compositor_period_ms = 0;
+	repeat_refresh();
+	assert(repeat_key == -1 && repeat_timeout() == -1);
+	assert(repeat_dispatch("test-session", 42) == 0 && played == 2);
+
+	compositor_period_ms = REPEAT_PERIOD_MS;
+	repeat_refresh();
+	assert(repeat_key == -1);
+	event_type = LIBINPUT_EVENT_KEYBOARD_KEY;
+	queued = 1;
+	assert(handle_events(NULL, "test-session", 42) == 0);
+	assert(played == 3 && repeat_key == KEY_A);
 	return 0;
 }

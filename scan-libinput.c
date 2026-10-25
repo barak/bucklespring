@@ -131,6 +131,9 @@ static void repeat_refresh(void)
 
 	repeat_delay_ms = delay;
 	repeat_period_ms = period;
+	if(period <= 0) {
+		repeat_key = -1;
+	}
 
 	printd("Key repeat: %d ms delay, %d ms period", delay, period);
 }
