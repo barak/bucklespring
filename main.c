@@ -854,6 +854,10 @@ int play(int code, int press)
 	if (press) {
 		handle_mute_key(code == opt_mute_keycode);
 	}
+	if(muted) {
+		pthread_mutex_unlock(&audio_lock);
+		return 0;
+	}
 
 	int idx = code + press * 256;
 
@@ -885,8 +889,7 @@ int play(int code, int press)
 
 
 	if(src[idx] != 0 && src[idx] != SRC_INVALID) {
-		if (!muted)
-			alSourcePlay(src[idx]);
+		alSourcePlay(src[idx]);
 		TEST_ERROR("source playing");
 	}
 
