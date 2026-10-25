@@ -3,6 +3,7 @@
 #include "../scan-libinput.c"
 
 static int session_active = 1;
+static int session_checks;
 static int monitor_pending;
 static int poll_error;
 static int queued;
@@ -16,6 +17,7 @@ static enum libinput_event_type event_type = LIBINPUT_EVENT_KEYBOARD_KEY;
 int sd_session_is_active(const char *session)
 {
 	assert(strcmp(session, "test-session") == 0);
+	session_checks++;
 	return session_active;
 }
 
@@ -131,6 +133,14 @@ int main(void)
 	poll_error = 1;
 	queued = 1;
 	assert(handle_events(NULL, "test-session", 42) == -EIO);
+	assert(played == 2);
+
+	event_type = LIBINPUT_EVENT_POINTER_MOTION;
+	queued = 2;
+	before = destroyed;
+	int checks = session_checks;
+	assert(handle_events(NULL, "test-session", 42) == 0);
+	assert(session_checks == checks && destroyed == before + 2);
 	assert(played == 2);
 	return 0;
 }

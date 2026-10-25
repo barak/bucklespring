@@ -316,6 +316,15 @@ static int handle_events(struct libinput *li, const char *session, int monitor_f
 	libinput_dispatch(li);
 
 	while((ev = libinput_get_event(li))) {
+		enum libinput_event_type type = libinput_event_get_type(ev);
+		if(type != LIBINPUT_EVENT_KEYBOARD_KEY &&
+		   type != LIBINPUT_EVENT_POINTER_BUTTON &&
+		   type != LIBINPUT_EVENT_POINTER_SCROLL_WHEEL) {
+			libinput_event_destroy(ev);
+			libinput_dispatch(li);
+			continue;
+		}
+
 		int r = session_ready(session, monitor_fd);
 		if(r <= 0) {
 			repeat_key = -1;
@@ -323,7 +332,7 @@ static int handle_events(struct libinput *li, const char *session, int monitor_f
 			return r;
 		}
 
-		switch(libinput_event_get_type(ev)) {
+		switch(type) {
 			case LIBINPUT_EVENT_KEYBOARD_KEY:
 				handle_key(ev);
 				break;
@@ -369,6 +378,7 @@ int scan(int verbose)
 	sd_login_monitor *monitor = NULL;
 	char *session = NULL, *seat = NULL;
 	int active = 1;
+	int first = 1;
 	int r;
 
 	r = sd_pid_get_session(0, &session);
@@ -438,18 +448,21 @@ int scan(int verbose)
 				goto session_error;
 		}
 
-		r = sd_session_is_active(session);
-		if(r < 0)
-			goto session_error;
-		if(!!r != active) {
-			active = !!r;
-			if(active) {
-				if(libinput_resume(li) < 0) {
-					fprintf(stderr, "Failed to resume input devices\n");
-					goto out;
+		if(first || fds[2].revents) {
+			first = 0;
+			r = sd_session_is_active(session);
+			if(r < 0)
+				goto session_error;
+			if(!!r != active) {
+				active = !!r;
+				if(active) {
+					if(libinput_resume(li) < 0) {
+						fprintf(stderr, "Failed to resume input devices\n");
+						goto out;
+					}
+				} else {
+					suspend_input(li);
 				}
-			} else {
-				suspend_input(li);
 			}
 		}
 
