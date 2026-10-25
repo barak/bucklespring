@@ -66,7 +66,7 @@ AS_IF([test "x$enable_x11" != xno],
 AS_IF([test "x$enable_libinput" = xauto && test "x$host_kind" != xlinux],
   [enable_libinput=no])
 AS_IF([test "x$enable_libinput" != xno],
-  [PKG_CHECK_MODULES([LIBINPUT],[libinput libudev wayland-client],
+  [PKG_CHECK_MODULES([LIBINPUT],[libinput libudev wayland-client libsystemd],
      [enable_libinput=yes],
      [AS_IF([test "x$enable_libinput" = xyes],
             [AC_MSG_ERROR([--enable-libinput given but: $LIBINPUT_PKG_ERRORS])],

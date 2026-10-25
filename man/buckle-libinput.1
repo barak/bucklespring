@@ -26,6 +26,13 @@ with this flavour,
 grants that access to the user at the local seat, and is inert until armed;
 read the comments in it for how, and for what it costs you.
 .PP
+It requires a local login session managed by systemd-logind and uses that
+session's seat. Input devices are closed while the session is inactive;
+buffered events and key repeats are discarded when the session changes.
+When started as a user service outside a login session, it uses the user's
+primary graphical session. It refuses to capture input if no session or seat
+can be identified.
+.PP
 libinput discards the key repeat the kernel generates for a held key and
 leaves repeating to its caller, so this flavour keeps its own clock.  Nothing
 can tell it when a repeat has actually happened: a Wayland compositor sends

@@ -65,8 +65,8 @@ To compile on debian-based linux distributions, first make sure the require
 libraries and header files are installed, then simply run `make`:
 
 Every flavour needs OpenAL and alure.  `buckle-x11` needs libX11 and libXtst
-on top of that, and `buckle-libinput` needs libinput, libudev and
-libwayland-client.  The system tray icon needs GTK 3 and
+on top of that, and `buckle-libinput` needs libinput, libudev,
+libwayland-client and libsystemd.  The system tray icon needs GTK 3 and
 libayatana-appindicator; it is left out when they are missing.  Building from
 a git checkout rather than a release tarball also needs autoconf, automake and
 pkg-config.
@@ -75,7 +75,7 @@ pkg-config.
 ```
 $ sudo apt-get install build-essential autoconf automake pkg-config \
     libopenal-dev libalure-dev libxtst-dev \
-    libinput-dev libudev-dev libwayland-dev \
+    libinput-dev libudev-dev libwayland-dev libsystemd-dev \
     libgtk-3-dev libayatana-appindicator3-dev
 ```
 
@@ -118,6 +118,13 @@ turn it off.  The same goes for `--enable-tray` and `--disable-tray`.
 `./configure --help` lists the rest.
 
 #### Reading the input devices
+
+`buckle-libinput` requires a local login session managed by systemd-logind.
+It uses that session's seat, closes input devices while the session is
+inactive, and discards buffered events and key repeats when the session
+changes. When started as a user service outside a login session, it uses the
+user's primary graphical session. It refuses to capture input if no session
+or seat can be identified.
 
 `buckle-libinput` needs read access to `/dev/input/event*`, and running it as
 root is no answer: it then no longer reaches the sound daemon of your session.

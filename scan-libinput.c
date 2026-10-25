@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/poll.h>
@@ -8,6 +9,7 @@
 #include <sys/ioctl.h>
 
 #include <libinput.h>
+#include <systemd/sd-login.h>
 #include <linux/input.h>
 #include <linux/input-event-codes.h>
 
@@ -17,8 +19,24 @@
 static void kernel_repeat_from(int fd);
 
 
+static int session_ready(const char *session, int monitor_fd)
+{
+	struct pollfd monitor = { .fd = monitor_fd, .events = POLLIN };
+	int r = poll(&monitor, 1, 0);
+
+	if(r < 0)
+		return -errno;
+	if(r > 0)
+		return 0;
+	return sd_session_is_active(session);
+}
+
+
 static int open_restricted(const char *path, int flags, void *user_data)
 {
+	if(sd_session_is_active(user_data) <= 0)
+		return -EACCES;
+
 	int fd = open(path, flags);
 
 	if(fd < 0) {
@@ -179,6 +197,22 @@ static int repeat_timeout(void)
 }
 
 
+static int repeat_dispatch(const char *session, int monitor_fd)
+{
+	if(repeat_key < 0 || repeat_timeout() > 0)
+		return 0;
+
+	int r = session_ready(session, monitor_fd);
+	if(r > 0) {
+		play(repeat_key, 1);
+		repeat_after(repeat_period_ms);
+	} else {
+		repeat_key = -1;
+	}
+	return r < 0 ? r : 0;
+}
+
+
 static void handle_key(struct libinput_event *ev)
 {
 	struct libinput_event_keyboard *k = libinput_event_get_keyboard_event(ev);
@@ -275,13 +309,19 @@ static void handle_scroll(struct libinput_event *ev)
 }
 
 
-static void handle_events(struct libinput *li)
+static int handle_events(struct libinput *li, const char *session, int monitor_fd)
 {
 	struct libinput_event *ev;
 		
 	libinput_dispatch(li);
 
 	while((ev = libinput_get_event(li))) {
+		int r = session_ready(session, monitor_fd);
+		if(r <= 0) {
+			repeat_key = -1;
+			libinput_event_destroy(ev);
+			return r;
+		}
 
 		switch(libinput_event_get_type(ev)) {
 			case LIBINPUT_EVENT_KEYBOARD_KEY:
@@ -300,6 +340,18 @@ static void handle_events(struct libinput *li)
 		libinput_event_destroy(ev);
 		libinput_dispatch(li);
 	}
+	return 0;
+}
+
+
+static void suspend_input(struct libinput *li)
+{
+	struct libinput_event *ev;
+
+	repeat_key = -1;
+	libinput_suspend(li);
+	while((ev = libinput_get_event(li)))
+		libinput_event_destroy(ev);
 }
 
 
@@ -312,19 +364,46 @@ static void log_handler(struct libinput *li, enum libinput_log_priority priority
 
 int scan(int verbose)
 {
-	struct udev *udev;
-	struct libinput *li;
+	struct udev *udev = NULL;
+	struct libinput *li = NULL;
+	sd_login_monitor *monitor = NULL;
+	char *session = NULL, *seat = NULL;
+	int active = 1;
+	int r;
+
+	r = sd_pid_get_session(0, &session);
+	if(r < 0) {
+		uid_t uid;
+		r = sd_pid_get_owner_uid(0, &uid);
+		if(r >= 0)
+			r = sd_uid_get_display(uid, &session);
+	}
+	if(r < 0)
+		goto session_error;
+	r = sd_session_get_seat(session, &seat);
+	if(r < 0)
+		goto session_error;
+	r = sd_login_monitor_new("session", &monitor);
+	if(r < 0)
+		goto session_error;
+
+	int monitor_fd = sd_login_monitor_get_fd(monitor);
+	int monitor_events = sd_login_monitor_get_events(monitor);
+	if(monitor_fd < 0 || monitor_events < 0) {
+		r = monitor_fd < 0 ? monitor_fd : monitor_events;
+		goto session_error;
+	}
 
 	udev = udev_new();
-        if (!udev) {
-                fprintf(stderr, "Failed to initialize udev\n");
-                return -1;
-        }
+	if(!udev) {
+		fprintf(stderr, "Failed to initialize udev\n");
+		goto out;
+	}
 
-	li = libinput_udev_create_context(&interface, NULL, udev);
+	li = libinput_udev_create_context(&interface, session, udev);
 	if(!li) {
 		fprintf(stderr, "Failed to initialize context\n");
-		return -1;
+		goto out;
 	}
 
 	if(verbose) {
@@ -332,59 +411,93 @@ int scan(int verbose)
 		libinput_log_set_priority(li, LIBINPUT_LOG_PRIORITY_DEBUG);
 	}
 
-	if (libinput_udev_assign_seat(li, "seat0")) {
+	if(libinput_udev_assign_seat(li, seat)) {
 		fprintf(stderr, "Failed to set seat\n");
-		return -1;
+		goto out;
 	}
-
-	libinput_dispatch(li);
 
 	/* The compositor, if there is one, is polled alongside the input
 	 * devices so that a change to the repeat setting is picked up while
 	 * we are running rather than only at startup. */
 
-	struct pollfd fds[2];
-	int nfds = 1;
-
-	fds[0].fd = libinput_get_fd(li);
-	fds[0].events = POLLIN;
-	fds[0].revents = 0;
-
-	fds[1].fd = wl_repeat_open();
-	fds[1].events = POLLIN;
-	fds[1].revents = 0;
-	if(fds[1].fd >= 0) {
-		nfds = 2;
-	}
+	struct pollfd fds[] = {
+		{ .fd = libinput_get_fd(li), .events = POLLIN },
+		{ .fd = wl_repeat_open(), .events = POLLIN },
+		{ .fd = monitor_fd, .events = monitor_events },
+	};
 
 	repeat_refresh();
 
-	while(poll(fds, nfds, repeat_timeout()) > -1) {
+	for(;;) {
+		if(fds[2].revents) {
+			/* Switches can coalesce; discard input even if active again. */
+			suspend_input(li);
+			active = 0;
+			r = sd_login_monitor_flush(monitor);
+			if(r < 0)
+				goto session_error;
+		}
+
+		r = sd_session_is_active(session);
+		if(r < 0)
+			goto session_error;
+		if(!!r != active) {
+			active = !!r;
+			if(active) {
+				if(libinput_resume(li) < 0) {
+					fprintf(stderr, "Failed to resume input devices\n");
+					goto out;
+				}
+			} else {
+				suspend_input(li);
+			}
+		}
 
 		/* POLLHUP and friends matter as much as POLLIN here: once the
 		 * connection is gone its descriptor is closed, and polling a
 		 * closed descriptor would spin on POLLNVAL. */
 
-		if(nfds == 2 && fds[1].revents != 0) {
+		if(fds[1].fd >= 0 && fds[1].revents != 0) {
 			if(!wl_repeat_dispatch()) {
-				nfds = 1;
+				fds[1].fd = -1;
 			}
 			repeat_refresh();
 		}
 
-		if(repeat_key >= 0 && repeat_timeout() == 0) {
-			play(repeat_key, 1);
-			repeat_after(repeat_period_ms);
+		if(active) {
+			r = repeat_dispatch(session, monitor_fd);
+			if(r < 0)
+				goto session_error;
+			r = handle_events(li, session, monitor_fd);
+			if(r < 0)
+				goto session_error;
 		}
 
-		handle_events(li);
+		do {
+			r = poll(fds, 3, active ? repeat_timeout() : -1);
+		} while(r < 0 && errno == EINTR);
+		if(r < 0) {
+			r = -errno;
+			goto session_error;
+		}
+		if((fds[0].revents | fds[2].revents) & (POLLERR | POLLHUP | POLLNVAL)) {
+			r = -EIO;
+			goto session_error;
+		}
 	}
 
-	return 0;
+session_error:
+	fprintf(stderr, "Failed to monitor login session: %s\n", strerror(-r));
+out:
+	if(li) libinput_unref(li);
+	if(udev) udev_unref(udev);
+	sd_login_monitor_unref(monitor);
+	free(seat);
+	free(session);
+	return -1;
 }
 
 
 void open_console(void)
 {
 }
-

@@ -6,6 +6,8 @@ AM_CFLAGS = -Wall
 buckle_cppflags = -DPATH_AUDIO='"$(wavdir)"'
 
 bin_PROGRAMS =
+check_PROGRAMS =
+TESTS = $(check_PROGRAMS)
 dist_man1_MANS =
 dist_man8_MANS =
 CLEANFILES =
@@ -63,6 +65,10 @@ if BACKEND_LIBINPUT
 bin_PROGRAMS += buckle-libinput
 dist_man1_MANS += man/buckle-libinput.1
 dist_desktop_DATA += buckle-libinput.desktop
+check_PROGRAMS += test-libinput
+test_libinput_SOURCES = tests/test-libinput.c
+test_libinput_CFLAGS = $(AM_CFLAGS) $(LIBINPUT_CFLAGS)
+test_libinput_LDADD = $(LIBINPUT_LIBS)
 endif
 
 if BACKEND_MAC
