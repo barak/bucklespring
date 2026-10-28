@@ -50,6 +50,11 @@ void buckle_clip_sets_free(char **list);
 const char *buckle_clip_set(void);
 int buckle_set_clip_set(const char *name);
 
+/* Whether a key the set has nothing for borrows a clip, as -f asks for. */
+
+int buckle_fallback(void);
+void buckle_set_fallback(int on);
+
 int buckle_audio_connected(void);
 int buckle_audio_recover(void);
 char **buckle_audio_devices(void);

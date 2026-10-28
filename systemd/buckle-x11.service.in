@@ -12,7 +12,12 @@ After=graphical-session.target
 
 [Service]
 Type=exec
-ExecStart=@bindir@/buckle-x11
+# -f borrows a clip for any key the chosen set has nothing for.  Several of the
+# sets cover only the keys someone sat down and recorded, and none of them
+# covers the media keys, so without this a good deal of the keyboard is silent.
+# The tray menu has the same switch, and "systemctl --user edit buckle-x11"
+# takes it away for good.
+ExecStart=@bindir@/buckle-x11 -f
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict

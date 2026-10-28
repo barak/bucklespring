@@ -73,6 +73,7 @@ static GtkWidget *win_clips;
 static GtkWidget *win_devices;
 static GtkWidget *win_hrtf;
 static GtkWidget *win_hrtf_state;
+static GtkWidget *win_fallback;
 
 static void window_sync(void);
 static void window_show(void);
@@ -385,6 +386,17 @@ static void on_win_volume(GtkRange *range, gpointer data)
 }
 
 
+static void on_win_fallback(GtkToggleButton *button, gpointer data)
+{
+	(void)data;
+
+	if(syncing) {
+		return;
+	}
+	buckle_set_fallback(gtk_toggle_button_get_active(button));
+}
+
+
 static void on_win_clips(GtkComboBox *combo, gpointer data)
 {
 	char *name;
@@ -528,6 +540,8 @@ static void window_sync(void)
 	gtk_button_set_label(GTK_BUTTON(win_mute), label);
 
 	gtk_range_set_value(GTK_RANGE(win_volume), buckle_gain());
+	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(win_fallback),
+			buckle_fallback() ? TRUE : FALSE);
 
 	if(win_hrtf != NULL) {
 		int active = buckle_hrtf_active();
@@ -645,6 +659,12 @@ static void window_build(void)
 
 		window_row(grid, row++, "Headphone 3D", hbox);
 	}
+
+	win_fallback = gtk_check_button_new_with_label(
+			"Fallback sound for unknown keys");
+	g_signal_connect(win_fallback, "toggled",
+			G_CALLBACK(on_win_fallback), NULL);
+	gtk_box_pack_start(GTK_BOX(box), win_fallback, FALSE, FALSE, 0);
 
 	gtk_box_pack_start(GTK_BOX(box),
 			gtk_separator_new(GTK_ORIENTATION_HORIZONTAL),

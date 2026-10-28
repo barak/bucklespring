@@ -162,13 +162,14 @@ on regardless, as it does on a console where there is no display at all.
 
 #### The preferences window
 
-The volume, the clip set, the audio device and the headphone filter live here
-rather than in the menu.  A menu on a tray icon travels over dbusmenu, which
-carries labels and check marks rather than widgets: a volume there can only be
-a ladder of radio items, a device list has to be rebuilt as a submenu every
-time it changes, and the panel, not the program, decides when the menu closes.
-A window has a slider and two combo boxes and none of that.  It also means
-that a desktop with nothing listening for the icon still has all of it.
+The volume, the clip set, the audio device, the fallback sound and the
+headphone filter all live here rather than in the menu.  A menu on a tray icon
+travels over dbusmenu, which carries labels and check marks rather than
+widgets: a volume there can only be a ladder of radio items, a device list has
+to be rebuilt as a submenu every time it changes, and the panel, not the
+program, decides when the menu closes.  A window has a slider and two combo
+boxes and none of that.  It also means that a desktop with nothing listening
+for the icon still has all of it.
 
 The running buckle puts the window up when asked:
 
@@ -196,6 +197,10 @@ rather than to login, so it stops when you log out:
 ```
 $ systemctl --user enable --now buckle-x11
 ```
+
+Both units run with `-f`, so that the keys a set has no recording for still
+make a sound; `systemctl --user edit buckle-x11` is where to say otherwise,
+and the preferences window has the same switch for one session.
 
 #### Using snap on Ubuntu (since 16.04) and other distros
 

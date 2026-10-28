@@ -578,6 +578,41 @@ int buckle_set_clip_set(const char *name)
 
 
 /*
+ * --fallback-sound, from the window.  Several of the sets cover only the keys
+ * someone sat down and recorded, and no set covers the media keys at all, so
+ * this is the difference between a quiet keyboard and a whole one.  The clips
+ * already loaded were found under the old answer, so they are dropped and the
+ * next press of each key looks again.
+ */
+
+int buckle_fallback(void)
+{
+	int on;
+
+	pthread_mutex_lock(&audio_lock);
+	on = opt_fallback_sound;
+	pthread_mutex_unlock(&audio_lock);
+
+	return on;
+}
+
+
+void buckle_set_fallback(int on)
+{
+	on = on ? 1 : 0;
+
+	pthread_mutex_lock(&audio_lock);
+	if(on != opt_fallback_sound) {
+		opt_fallback_sound = on;
+		audio_forget_clips();
+	}
+	pthread_mutex_unlock(&audio_lock);
+
+	printd("Fallback sound %s", on ? "on" : "off");
+}
+
+
+/*
  * ALC_DEVICE_SPECIFIER is not the list of sound cards: with OpenAL Soft it is
  * one entry, "OpenAL Soft", standing for whatever that library decides to
  * use.  The real outputs are behind ALC_ENUMERATE_ALL_EXT, so ask for those
