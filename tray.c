@@ -20,6 +20,9 @@
 #include <string.h>
 
 #include <gtk/gtk.h>
+#ifdef GDK_WINDOWING_X11
+#include <gdk/gdkx.h>
+#endif
 #include <libayatana-appindicator/app-indicator.h>
 
 #include "buckle.h"
@@ -313,6 +316,58 @@ static GtkWidget *volume_menu(void)
 }
 
 
+/*
+ * An AppIndicator that does not fall back to a GtkStatusIcon.
+ *
+ * With no StatusNotifierItem host on the session bus -- a GNOME Shell without
+ * the AppIndicator extension, say -- libayatana-appindicator puts up a
+ * GtkStatusIcon instead.  That is an XEmbed icon in a panel's notification
+ * area, which GTK3 builds for the X11 backend only: on Wayland the widget
+ * behind it is never created, and the library's attempt to dress the icon
+ * walks into gtk_widget_get_scale_factor(NULL), which leaves a Gtk-CRITICAL
+ * in the journal and nothing on the screen.  Where the fallback cannot work
+ * it is declined, which is the same outcome without the complaint.
+ */
+
+#define BUCKLE_TYPE_INDICATOR (buckle_indicator_get_type())
+
+typedef struct { AppIndicator parent; } BuckleIndicator;
+typedef struct { AppIndicatorClass parent_class; } BuckleIndicatorClass;
+
+G_DEFINE_TYPE(BuckleIndicator, buckle_indicator, APP_INDICATOR_TYPE)
+
+static GtkStatusIcon *buckle_indicator_fallback(AppIndicator *self)
+{
+#ifdef GDK_WINDOWING_X11
+	GdkDisplay *display = gdk_display_get_default();
+
+	if(display != NULL && GDK_IS_X11_DISPLAY(display)) {
+		return APP_INDICATOR_CLASS(buckle_indicator_parent_class)
+				->fallback(self);
+	}
+#else
+	(void)self;
+#endif
+
+	printd("No StatusNotifierItem host on the bus and no X11 "
+			"notification area to fall back to, so no tray icon");
+
+	return NULL;
+}
+
+
+static void buckle_indicator_class_init(BuckleIndicatorClass *klass)
+{
+	APP_INDICATOR_CLASS(klass)->fallback = buckle_indicator_fallback;
+}
+
+
+static void buckle_indicator_init(BuckleIndicator *self)
+{
+	(void)self;
+}
+
+
 int tray_init(void)
 {
 	AppIndicator *indicator;
@@ -346,14 +401,25 @@ int tray_init(void)
 
 	gtk_widget_show_all(menu);
 
-	/* app_indicator_new() is marked deprecated with nothing named in its
-	 * place: it is the GTK3 binding as a whole that is giving way to a
-	 * GLib-only one, and this is still the constructor it offers. */
+	/*
+	 * app_indicator_new() is deprecated in favour of the GLib-only
+	 * libayatana-appindicator-glib, and warns to that effect on every
+	 * start.  The advice cannot be taken yet: the new library carries its
+	 * menu over org.gtk.Menus, where the panels this icon has to appear in
+	 * -- the Plasma tray, the GNOME Shell AppIndicator extension -- read
+	 * it over com.canonical.dbusmenu, which is what this one speaks.
+	 *
+	 * All the deprecated call does is g_object_new() with these three
+	 * properties, and the subclass above has to be constructed that way
+	 * in any case.  "Hardware" is the category's name on the wire, from
+	 * the StatusNotifierItem specification.
+	 */
 
-	G_GNUC_BEGIN_IGNORE_DEPRECATIONS
-	indicator = app_indicator_new(PACKAGE_NAME, "input-keyboard",
-			APP_INDICATOR_CATEGORY_HARDWARE);
-	G_GNUC_END_IGNORE_DEPRECATIONS
+	indicator = g_object_new(BUCKLE_TYPE_INDICATOR,
+			"id", PACKAGE_NAME,
+			"category", "Hardware",
+			"icon-name", "input-keyboard",
+			NULL);
 	app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
 	app_indicator_set_title(indicator, "Bucklespring");
 	app_indicator_set_menu(indicator, GTK_MENU(menu));
