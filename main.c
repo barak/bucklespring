@@ -184,7 +184,19 @@ struct clip {
 	int tried;	/* looked for already, so a miss is not looked for again */
 };
 
-static struct clip clips[512];
+/*
+ * Every key code the kernel has, which runs to KEY_MAX, 0x2ff.  The table
+ * used to stop at 0x100, enough for the codes an X11 keyboard can send and
+ * for the 0xff this program plays mouse buttons under, but a keyboard read
+ * through libinput sends the kernel's own codes: the Fn key of a bluetooth
+ * keyboard is KEY_FN, 0x1d0, and the media and consumer keys above it go on
+ * to 0x2ff.  Pressing one of those indexed tens of kilobytes past the end of
+ * the table and wrote the clip there, which crashed the libinput flavour.
+ */
+
+#define CODE_COUNT 0x300
+
+static struct clip clips[2 * CODE_COUNT];
 
 
 /* Options with no short form of their own start past the character codes. */
@@ -1505,6 +1517,15 @@ int play(int code, int press)
 
 	printd("scancode %d/0x%x", code, code);
 
+	/* No event source should offer a code outside the kernel's range, and
+	 * one that did must not land in some other key's clip. */
+
+	if(code < 0 || code >= CODE_COUNT) {
+		printd("scancode 0x%x is outside 0..0x%x, ignored",
+				code, CODE_COUNT - 1);
+		return -1;
+	}
+
 	pthread_mutex_lock(&audio_lock);
 
 	/*
@@ -1524,7 +1545,7 @@ int play(int code, int press)
 		handle_mute_key(code == opt_mute_keycode);
 	}
 
-	struct clip *clip = &clips[code + press * 256];
+	struct clip *clip = &clips[code + (press ? 1 : 0) * CODE_COUNT];
 
 	if(!clip->tried) {
 

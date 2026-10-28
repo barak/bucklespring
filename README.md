@@ -262,6 +262,12 @@ each time the key is pressed. That is what stops a held or repeated key
 sounding like a loop of one click. A set with a single recording per key
 names it `XX-Y.ext` as before.
 
+`XX` there is the key code in hexadecimal and `Y` is 1 for the key going down,
+0 for it coming up. The codes the libinput flavour sees are the kernel's own,
+which run past two digits: the Fn key of a bluetooth keyboard is `1d0`, and
+the media keys above it go on to `2ff`. Every mouse button and every detent of
+the wheel sounds as `ff`.
+
 Clips are read with libsndfile, so a set may be `.flac`, `.wav`, `.ogg` or
 `.opus`; the first of those found for a given key wins, in that order. The set
 shipped here is FLAC, which is lossless and a little under half the size of
