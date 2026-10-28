@@ -9,4 +9,9 @@ Keywords=keyboard;sound;typewriter;nostalgia;
 StartupNotify=false
 Terminal=false
 Hidden=false
+Actions=Preferences;
+
+[Desktop Action Preferences]
+Name=Bucklespring preferences
+Exec=buckle-libinput --preferences
 

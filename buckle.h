@@ -40,6 +40,11 @@ void buckle_quit(void);
 
 int tray_init(void);
 void tray_run(void);
+
+/* Ask the bucklespring already running for its preferences window; what
+ * --preferences does, in the process started to ask.  Zero if it was shown. */
+
+int tray_show_running(void);
 int repeat_enabled(void);
 void repeat_override(int *delay_ms, int *period_ms);
 int scan(int verbose);

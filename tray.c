@@ -1,6 +1,15 @@
 /*
- * An icon in the system tray, with a menu for the things worth reaching for
- * without a terminal: pause, volume, which audio device, and quit.
+ * Two ways in without a terminal: an icon in the system tray, and a
+ * preferences window.
+ *
+ * The menu on the icon holds the two things worth doing in one click --
+ * pause and resume, and quit -- and an entry that opens the window.
+ * Everything else is in the window.  The split is not only tidiness: a
+ * StatusNotifierItem menu travels over dbusmenu, which carries item
+ * properties rather than widgets, so a volume there could only ever be a
+ * ladder of radio items, a device list has to be rebuilt as a submenu
+ * whenever ALC's answer changes, and the panel decides when the menu closes.
+ * A window has a slider, a combo box and none of that machinery.
  *
  * The icon is a StatusNotifierItem, put up through libayatana-appindicator.
  * That is what KDE shows natively and what the AppIndicator extension shows
@@ -17,9 +26,15 @@
 #include <config.h>
 #endif
 
+#include <signal.h>
+#include <stdarg.h>
 #include <string.h>
 
 #include <gtk/gtk.h>
+#include <gio/gio.h>
+#ifdef G_OS_UNIX
+#include <glib-unix.h>
+#endif
 #ifdef GDK_WINDOWING_X11
 #include <gdk/gdkx.h>
 #endif
@@ -31,21 +46,22 @@
 #define DEFAULT_MUTE_KEYCODE 0x46 /* Scroll Lock */
 
 static GtkWidget *item_mute;
-static GtkWidget *item_volume;
 
 /*
- * The volume levels, as radio items in a submenu.  A real slider is not on
- * offer: a StatusNotifierItem menu travels over dbusmenu, which carries item
- * properties and not widgets, so whatever is built here has to be made of
- * labels and check marks.  Nor can a client keep the menu open across a
- * click; that is the panel's business.  So the levels are one click each
- * rather than a click per step, with the two ends to push for finer moves,
- * and a scroll over the icon for when the menu is in the way entirely.
+ * The controls window: built the first time it is asked for, and from then on
+ * kept and hidden rather than destroyed, so that it comes back where the user
+ * left it.  window_show() says why it exists at all.
  */
 
-#define VOLUME_LEVELS 11
+static GtkWidget *window;
+static GtkWidget *win_mute;
+static GtkWidget *win_volume;
+static GtkWidget *win_devices;
 
-static GtkWidget *level_item[VOLUME_LEVELS];
+static void window_sync(void);
+static void window_show(void);
+static void window_refill_devices(void);
+
 static int syncing = 0;
 
 
@@ -63,6 +79,36 @@ static const char *mute_sequence(void)
 }
 
 
+/*
+ * What a setting that will not take says for itself.  These come from the
+ * window's own controls, so the window is the parent while it is up; a modal
+ * dialog with no parent is all that can be done without it.
+ */
+
+static void warn_dialog(const char *fmt, ...) G_GNUC_PRINTF(1, 2);
+
+static void warn_dialog(const char *fmt, ...)
+{
+	GtkWindow *parent = NULL;
+	GtkWidget *dialog;
+	va_list ap;
+	char text[512];
+
+	if(window != NULL && gtk_widget_get_visible(window)) {
+		parent = GTK_WINDOW(window);
+	}
+
+	va_start(ap, fmt);
+	g_vsnprintf(text, sizeof text, fmt, ap);
+	va_end(ap);
+
+	dialog = gtk_message_dialog_new(parent, 0, GTK_MESSAGE_WARNING,
+			GTK_BUTTONS_CLOSE, "%s", text);
+	gtk_dialog_run(GTK_DIALOG(dialog));
+	gtk_widget_destroy(dialog);
+}
+
+
 static void sync_menu(void)
 {
 	char label[128];
@@ -71,23 +117,7 @@ static void sync_menu(void)
 			buckle_muted() ? "Resume" : "Pause", mute_sequence());
 	gtk_menu_item_set_label(GTK_MENU_ITEM(item_mute), label);
 
-	g_snprintf(label, sizeof label, "Volume: %d%%", buckle_gain());
-	gtk_menu_item_set_label(GTK_MENU_ITEM(item_volume), label);
-
-	/* Tick the level nearest the gain, which the keyboard and the scroll
-	 * wheel can have moved off a step.  Setting it emits "toggled", hence
-	 * the guard. */
-
-	syncing = 1;
-	{
-		int nearest = (buckle_gain() + VOLUME_STEP / 2) / VOLUME_STEP;
-
-		if(nearest < 0) { nearest = 0; }
-		if(nearest > VOLUME_LEVELS - 1) { nearest = VOLUME_LEVELS - 1; }
-		gtk_check_menu_item_set_active(
-				GTK_CHECK_MENU_ITEM(level_item[nearest]), TRUE);
-	}
-	syncing = 0;
+	window_sync();
 }
 
 
@@ -107,24 +137,6 @@ static void on_mute(GtkMenuItem *item, gpointer data)
 	(void)item;
 	(void)data;
 	buckle_set_muted(!buckle_muted());
-	sync_menu();
-}
-
-
-static void on_volume(GtkMenuItem *item, gpointer data)
-{
-	(void)item;
-	buckle_set_gain(buckle_gain() + GPOINTER_TO_INT(data));
-	sync_menu();
-}
-
-
-static void on_level(GtkCheckMenuItem *item, gpointer data)
-{
-	if(syncing || !gtk_check_menu_item_get_active(item)) {
-		return;
-	}
-	buckle_set_gain(GPOINTER_TO_INT(data));
 	sync_menu();
 }
 
@@ -162,32 +174,7 @@ static void on_scroll(AppIndicator *indicator, gint delta,
 }
 
 
-static void on_device(GtkCheckMenuItem *item, gpointer data)
-{
-	const char *name = data;
-
-	/* Picking the one already in use, or the echo of our own call to
-	 * gtk_check_menu_item_set_active() below, is not worth a device
-	 * change; and only the item being switched on means anything. */
-
-	if(!gtk_check_menu_item_get_active(item)) {
-		return;
-	}
-	if(g_strcmp0(name, buckle_audio_device()) == 0) {
-		return;
-	}
-
-	if(buckle_set_audio_device(name) < 0) {
-		GtkWidget *dialog = gtk_message_dialog_new(NULL, 0,
-				GTK_MESSAGE_WARNING, GTK_BUTTONS_CLOSE,
-				"Could not switch to the audio device \"%s\".", name);
-		gtk_dialog_run(GTK_DIALOG(dialog));
-		gtk_widget_destroy(dialog);
-	}
-}
-
-
-static void on_about(GtkMenuItem *item, gpointer data)
+static void on_about(GtkWidget *item, gpointer data)
 {
 	(void)item;
 	(void)data;
@@ -216,7 +203,15 @@ static void on_about(GtkMenuItem *item, gpointer data)
 }
 
 
-static void on_quit(GtkMenuItem *item, gpointer data)
+static void on_preferences(GtkWidget *item, gpointer data)
+{
+	(void)item;
+	(void)data;
+	window_show();
+}
+
+
+static void on_quit(GtkWidget *item, gpointer data)
 {
 	(void)item;
 	(void)data;
@@ -244,75 +239,383 @@ static void menu_separator(GtkWidget *menu)
 }
 
 
-/* The device names are handed to the menu items and outlive this call, so
- * the list is kept rather than freed. */
+/*
+ * The controls, which share one guard: setting a widget to what the program
+ * already thinks must not read back as the user asking for it.
+ */
 
-static void append_devices(GtkWidget *menu)
+static void on_win_mute(GtkButton *button, gpointer data)
 {
-	GtkWidget *item = gtk_menu_item_new_with_label("Audio device");
-	GtkWidget *sub = gtk_menu_new();
-	GSList *group = NULL;
-	char **list = buckle_audio_devices();
-	size_t i;
-
-	for(i = 0; list != NULL && list[i] != NULL; i++) {
-		GtkWidget *radio =
-			gtk_radio_menu_item_new_with_label(group, list[i]);
-
-		group = gtk_radio_menu_item_get_group(GTK_RADIO_MENU_ITEM(radio));
-
-		if(g_strcmp0(list[i], buckle_audio_device()) == 0) {
-			gtk_check_menu_item_set_active(
-					GTK_CHECK_MENU_ITEM(radio), TRUE);
-		}
-
-		g_signal_connect(radio, "toggled", G_CALLBACK(on_device), list[i]);
-		gtk_menu_shell_append(GTK_MENU_SHELL(sub), radio);
-	}
-
-	if(i == 0) {
-		GtkWidget *none = gtk_menu_item_new_with_label("(none found)");
-		gtk_widget_set_sensitive(none, FALSE);
-		gtk_menu_shell_append(GTK_MENU_SHELL(sub), none);
-	}
-
-	gtk_menu_item_set_submenu(GTK_MENU_ITEM(item), sub);
-	gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+	(void)button;
+	(void)data;
+	buckle_set_muted(!buckle_muted());
+	sync_menu();
 }
 
 
-/* Louder and quieter at the two ends, with every tenth in between. */
-
-static GtkWidget *volume_menu(void)
+static void on_win_volume(GtkRange *range, gpointer data)
 {
-	GtkWidget *sub = gtk_menu_new();
-	GSList *group = NULL;
-	int i;
+	(void)data;
 
-	menu_item(sub, "+   Louder", G_CALLBACK(on_volume),
-			GINT_TO_POINTER(VOLUME_STEP));
-	menu_separator(sub);
+	if(syncing) {
+		return;
+	}
+	buckle_set_gain((int)gtk_range_get_value(range));
+	sync_menu();
+}
 
-	for(i = VOLUME_LEVELS - 1; i >= 0; i--) {
-		char label[32];
-		GtkWidget *radio;
 
-		g_snprintf(label, sizeof label, "%d%%", i * VOLUME_STEP);
-		radio = gtk_radio_menu_item_new_with_label(group, label);
-		group = gtk_radio_menu_item_get_group(GTK_RADIO_MENU_ITEM(radio));
+static void on_win_device(GtkComboBox *combo, gpointer data)
+{
+	char *name;
 
-		g_signal_connect(radio, "toggled", G_CALLBACK(on_level),
-				GINT_TO_POINTER(i * VOLUME_STEP));
-		gtk_menu_shell_append(GTK_MENU_SHELL(sub), radio);
+	(void)data;
 
-		level_item[i] = radio;
+	if(syncing) {
+		return;
 	}
 
-	menu_separator(sub);
-	menu_item(sub, "-   Quieter", G_CALLBACK(on_volume),
-			GINT_TO_POINTER(-VOLUME_STEP));
+	name = gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(combo));
+	if(name != NULL && g_strcmp0(name, buckle_audio_device()) != 0
+			&& buckle_set_audio_device(name) < 0) {
+		warn_dialog("Could not switch to the audio device \"%s\".", name);
+	}
+	g_free(name);
+}
 
-	return sub;
+
+static void on_win_close(GtkButton *button, gpointer data)
+{
+	(void)button;
+	(void)data;
+	gtk_widget_hide(window);
+}
+
+
+/*
+ * A list that has changed under us, as the audio devices do.  Rebuilt rather
+ * than merged: it is a handful of entries and the combo box has no notion of
+ * a diff.
+ */
+
+static void window_fill_combo(GtkWidget *combo, char **list,
+		const char *current, const char *empty)
+{
+	int saved = syncing;
+	size_t i;
+
+	syncing = 1;
+	gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(combo));
+
+	for(i = 0; list != NULL && list[i] != NULL; i++) {
+		gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(combo), list[i]);
+		if(g_strcmp0(list[i], current) == 0) {
+			gtk_combo_box_set_active(GTK_COMBO_BOX(combo), (int)i);
+		}
+	}
+
+	/* Nothing to choose between is said rather than left blank, and there
+	 * is then nothing to choose. */
+
+	if(i == 0) {
+		gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(combo), empty);
+		gtk_combo_box_set_active(GTK_COMBO_BOX(combo), 0);
+	}
+	gtk_widget_set_sensitive(combo, i > 0);
+
+	syncing = saved;
+}
+
+
+static void window_refill_devices(void)
+{
+	char **list;
+
+	if(window == NULL) {
+		return;
+	}
+
+	list = buckle_audio_devices();
+	window_fill_combo(win_devices, list, buckle_audio_device(),
+			"(none found)");
+	buckle_audio_devices_free(list);
+}
+
+
+static void window_sync(void)
+{
+	int saved = syncing;
+	char label[128];
+
+	if(window == NULL) {
+		return;
+	}
+
+	syncing = 1;
+
+	g_snprintf(label, sizeof label, "%s  (%s)",
+			buckle_muted() ? "Resume" : "Pause", mute_sequence());
+	gtk_button_set_label(GTK_BUTTON(win_mute), label);
+
+	gtk_range_set_value(GTK_RANGE(win_volume), buckle_gain());
+
+	syncing = saved;
+}
+
+
+/* A label on the left and the control on the right, which is every row of
+ * the grid. */
+
+static void window_row(GtkWidget *grid, int row, const char *text,
+		GtkWidget *control)
+{
+	GtkWidget *label = gtk_label_new(text);
+
+	gtk_widget_set_halign(label, GTK_ALIGN_START);
+	gtk_grid_attach(GTK_GRID(grid), label, 0, row, 1, 1);
+	gtk_grid_attach(GTK_GRID(grid), control, 1, row, 1, 1);
+}
+
+
+static GtkWidget *window_button(GtkWidget *box, const char *label, GCallback cb)
+{
+	GtkWidget *button = gtk_button_new_with_label(label);
+
+	g_signal_connect(button, "clicked", cb, NULL);
+	gtk_box_pack_start(GTK_BOX(box), button, FALSE, FALSE, 0);
+
+	return button;
+}
+
+
+static void window_build(void)
+{
+	GtkWidget *box;
+	GtkWidget *grid;
+	GtkWidget *buttons;
+	int row = 0;
+
+	window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+	gtk_window_set_title(GTK_WINDOW(window), "Bucklespring Preferences");
+	gtk_window_set_icon_name(GTK_WINDOW(window), "input-keyboard");
+	gtk_window_set_resizable(GTK_WINDOW(window), FALSE);
+
+	/* Closing the window is not quitting: the clicks go on, and the
+	 * window can be asked for again. */
+
+	g_signal_connect(window, "delete-event",
+			G_CALLBACK(gtk_widget_hide_on_delete), NULL);
+
+	box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+	gtk_container_set_border_width(GTK_CONTAINER(box), 12);
+	gtk_container_add(GTK_CONTAINER(window), box);
+
+	win_mute = gtk_button_new_with_label("Pause");
+	g_signal_connect(win_mute, "clicked", G_CALLBACK(on_win_mute), NULL);
+	gtk_box_pack_start(GTK_BOX(box), win_mute, FALSE, FALSE, 0);
+
+	grid = gtk_grid_new();
+	gtk_grid_set_row_spacing(GTK_GRID(grid), 6);
+	gtk_grid_set_column_spacing(GTK_GRID(grid), 12);
+	gtk_box_pack_start(GTK_BOX(box), grid, FALSE, FALSE, 0);
+
+	/* The one control here that the menu cannot have: dbusmenu carries
+	 * labels and check marks, and a window can carry a slider. */
+
+	win_volume = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL,
+			0, 100, VOLUME_STEP / 2);
+	gtk_scale_set_digits(GTK_SCALE(win_volume), 0);
+	gtk_scale_set_value_pos(GTK_SCALE(win_volume), GTK_POS_RIGHT);
+	gtk_widget_set_size_request(win_volume, 240, -1);
+	gtk_widget_set_hexpand(win_volume, TRUE);
+	g_signal_connect(win_volume, "value-changed",
+			G_CALLBACK(on_win_volume), NULL);
+	window_row(grid, row++, "Volume", win_volume);
+
+	win_devices = gtk_combo_box_text_new();
+	g_signal_connect(win_devices, "changed", G_CALLBACK(on_win_device), NULL);
+	window_row(grid, row++, "Audio device", win_devices);
+
+	gtk_box_pack_start(GTK_BOX(box),
+			gtk_separator_new(GTK_ORIENTATION_HORIZONTAL),
+			FALSE, FALSE, 0);
+
+	buttons = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+	gtk_widget_set_halign(buttons, GTK_ALIGN_END);
+	gtk_box_pack_start(GTK_BOX(box), buttons, FALSE, FALSE, 0);
+
+	window_button(buttons, "About", G_CALLBACK(on_about));
+	window_button(buttons, "Quit", G_CALLBACK(on_quit));
+	window_button(buttons, "Close", G_CALLBACK(on_win_close));
+}
+
+
+/*
+ * The window, on request.
+ *
+ * A tray icon exists only where something hosts it.  KDE Plasma does, and
+ * GNOME Shell does once the AppIndicator extension is installed, but a plain
+ * GNOME Shell or a bare compositor has nowhere to put one, and then the entry
+ * on the menu is out of reach along with the icon it hangs from.
+ *
+ * It is not put up by itself: an unasked-for window at login would be worse
+ * than no icon.  It is asked for, by "buckle --preferences" through the
+ * session bus below, by the action on the desktop file, which runs that, or
+ * by SIGUSR1, for a keyboard shortcut bound to a bare
+ * "pkill -USR1 buckle-libinput".
+ */
+
+static void window_show(void)
+{
+	if(window == NULL) {
+		window_build();
+	}
+
+	/* Nothing asks ALC while the window is down, so the list is read
+	 * again every time it goes up. */
+
+	window_refill_devices();
+
+	window_sync();
+	gtk_widget_show_all(window);
+	gtk_window_present(GTK_WINDOW(window));
+
+	printd("Controls window shown");
+}
+
+
+/*
+ * Being asked.  A name on the session bus is what lets a second invocation
+ * reach the running one: a desktop file action or a desktop's keyboard
+ * shortcut can run a command, but cannot reach into a process that is already
+ * there, and the window has to be the running program's own or it would have
+ * nothing to show.
+ */
+
+#define BUCKLE_BUS_NAME "nl.zevv.Bucklespring"
+#define BUCKLE_BUS_PATH "/nl/zevv/Bucklespring"
+
+static const char bus_introspection[] =
+	"<node>"
+	"  <interface name='" BUCKLE_BUS_NAME "'>"
+	"    <method name='Show'/>"
+	"  </interface>"
+	"</node>";
+
+static void on_bus_call(GDBusConnection *conn, const char *sender,
+		const char *path, const char *iface, const char *method,
+		GVariant *params, GDBusMethodInvocation *invocation,
+		gpointer data)
+{
+	(void)conn;
+	(void)sender;
+	(void)path;
+	(void)iface;
+	(void)params;
+	(void)data;
+
+	if(g_strcmp0(method, "Show") == 0) {
+		window_show();
+		g_dbus_method_invocation_return_value(invocation, NULL);
+		return;
+	}
+
+	g_dbus_method_invocation_return_error(invocation, G_DBUS_ERROR,
+			G_DBUS_ERROR_UNKNOWN_METHOD, "No method \"%s\"", method);
+}
+
+
+static void on_bus_acquired(GDBusConnection *conn, const char *name,
+		gpointer data)
+{
+	static const GDBusInterfaceVTable vtable = {
+		on_bus_call, NULL, NULL, { NULL }
+	};
+	GDBusNodeInfo *info;
+	GError *err = NULL;
+
+	(void)name;
+	(void)data;
+
+	info = g_dbus_node_info_new_for_xml(bus_introspection, &err);
+	if(info == NULL) {
+		printd("Cannot parse the bus interface: %s", err->message);
+		g_error_free(err);
+		return;
+	}
+
+	if(g_dbus_connection_register_object(conn, BUCKLE_BUS_PATH,
+			info->interfaces[0], &vtable, NULL, NULL, &err) == 0) {
+		printd("Cannot answer on the session bus: %s", err->message);
+		g_error_free(err);
+	}
+
+	g_dbus_node_info_unref(info);
+}
+
+
+/* Two of these running at once is not an error: the first one keeps the name
+ * and --preferences reaches that one. */
+
+static void on_name_lost(GDBusConnection *conn, const char *name, gpointer data)
+{
+	(void)conn;
+	(void)data;
+
+	printd("Another bucklespring already answers to %s, so --preferences will "
+			"reach that one", name);
+}
+
+
+#ifdef G_OS_UNIX
+static gboolean on_sigusr1(gpointer data)
+{
+	(void)data;
+	window_show();
+	return G_SOURCE_CONTINUE;
+}
+#endif
+
+
+/*
+ * The other half of --preferences, in the process that was started to ask.
+ * It talks to the bus and not to the window, so it needs no display of its
+ * own and does not care which flavour is running.
+ */
+
+int tray_show_running(void)
+{
+	GDBusConnection *conn;
+	GVariant *reply;
+	GError *err = NULL;
+
+	conn = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, &err);
+	if(conn == NULL) {
+		g_printerr("No session bus to ask: %s\n", err->message);
+		g_error_free(err);
+		return -1;
+	}
+
+	/* NO_AUTO_START: there is no service file to start, and the point of
+	 * the call is to reach the program that is already running. */
+
+	reply = g_dbus_connection_call_sync(conn, BUCKLE_BUS_NAME,
+			BUCKLE_BUS_PATH, BUCKLE_BUS_NAME, "Show", NULL, NULL,
+			G_DBUS_CALL_FLAGS_NO_AUTO_START, 5000, NULL, &err);
+	if(reply == NULL) {
+		g_printerr("No running bucklespring answered: %s\n",
+				err->message);
+		g_printerr("Start one first, or give it a display to put the "
+				"window on.\n");
+		g_error_free(err);
+		g_object_unref(conn);
+		return -1;
+	}
+
+	g_variant_unref(reply);
+	g_object_unref(conn);
+
+	return 0;
 }
 
 
@@ -350,7 +653,9 @@ static GtkStatusIcon *buckle_indicator_fallback(AppIndicator *self)
 #endif
 
 	printd("No StatusNotifierItem host on the bus and no X11 "
-			"notification area to fall back to, so no tray icon");
+			"notification area to fall back to, so no tray icon; "
+			"\"--preferences\" opens a window with the rest "
+			"of the settings");
 
 	return NULL;
 }
@@ -386,18 +691,9 @@ int tray_init(void)
 
 	menu_separator(menu);
 
-	item_volume = gtk_menu_item_new_with_label("Volume");
-	gtk_menu_shell_append(GTK_MENU_SHELL(menu), item_volume);
-	gtk_menu_item_set_submenu(GTK_MENU_ITEM(item_volume), volume_menu());
-
-	menu_separator(menu);
-
-	append_devices(menu);
-
-	menu_separator(menu);
-
-	menu_item(menu, "About Bucklespring", G_CALLBACK(on_about), NULL);
-	menu_item(menu, "Quit", G_CALLBACK(on_quit), NULL);
+	menu_item(menu, "Preferences", G_CALLBACK(on_preferences), NULL);
+	menu_item(menu, "Quit Bucklespring " PACKAGE_VERSION,
+			G_CALLBACK(on_quit), NULL);
 
 	gtk_widget_show_all(menu);
 
@@ -425,6 +721,20 @@ int tray_init(void)
 	app_indicator_set_menu(indicator, GTK_MENU(menu));
 	g_signal_connect(indicator, APP_INDICATOR_SIGNAL_SCROLL_EVENT,
 			G_CALLBACK(on_scroll), NULL);
+
+	/*
+	 * What answers --preferences, and what a keyboard shortcut can poke
+	 * without any dbus tooling about it.  Neither needs the icon to have
+	 * worked, which is the point of them.
+	 */
+
+	g_bus_own_name(G_BUS_TYPE_SESSION, BUCKLE_BUS_NAME,
+			G_BUS_NAME_OWNER_FLAGS_NONE, on_bus_acquired, NULL,
+			on_name_lost, NULL, NULL);
+
+#ifdef G_OS_UNIX
+	g_unix_signal_add(SIGUSR1, on_sigusr1, NULL);
+#endif
 
 	sync_menu();
 	g_timeout_add(500, on_tick, NULL);

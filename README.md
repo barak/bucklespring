@@ -137,24 +137,56 @@ programs included.  Delete the flag file and trigger again to take it back.
 #### The tray icon
 
 Where GTK 3 and libayatana-appindicator were found at build time, buckle puts
-an icon in the system tray with a menu for the things worth reaching without a
-terminal: pause and resume, the volume, which audio device to play to, and
-quit.  `--no-tray` leaves it out for one run.
+an icon in the system tray.  Its menu is short on purpose:
 
-The volume is a submenu of levels, any of which is one click away, with `+`
-and `-` at the two ends for a nudge.  Rolling the mouse wheel over the icon
-itself also works, and does not involve opening the menu at all.  A slider
-would be nicer, but a tray menu travels over dbusmenu, which carries labels
-and check marks rather than widgets, so there is no slider to be had; nor can
-the program keep the menu open after a click, which is the panel's decision.
+```
+Pause  (ScrollLock × 2)
+—
+Preferences
+Quit Bucklespring 1.5.2~dev
+```
+
+Pause and quit are the two things worth doing in one click, and everything
+else is in the preferences window that the third entry opens.  The version is
+on the quit entry because the menu has no About entry to carry it.  Rolling
+the mouse wheel over the icon changes the volume without opening the menu at
+all.  `--no-tray` leaves the icon out for one run.
+
+Pausing from the menu and pausing from the keyboard are the same switch, so
+the menu follows along when you use the key.
 
 The icon is a StatusNotifierItem.  KDE Plasma shows those as they are; GNOME
 Shell needs an extension, `gnome-shell-extension-appindicator` on Debian.
 Where nothing is listening the icon simply does not appear, and buckle carries
 on regardless, as it does on a console where there is no display at all.
 
-Pausing from the menu and pausing from the keyboard are the same switch, so
-the menu follows along when you use the key.
+#### The preferences window
+
+The volume and the audio device live here rather than in the menu.  A menu on
+a tray icon travels over dbusmenu, which carries labels and check marks rather
+than widgets: a volume there can only be a ladder of radio items, a device
+list has to be rebuilt as a submenu every time it changes, and the panel, not
+the program, decides when the menu closes.  A window has a slider and a combo
+box and none of that.  It also means that a desktop with nothing listening for
+the icon still has all of it.
+
+The running buckle puts the window up when asked:
+
+```
+$ buckle-x11 --preferences
+```
+
+That second invocation plays nothing and holds no sound device of its own.  It
+asks over the session bus, where the running one answers to
+`nl.zevv.Bucklespring`, and then exits; the window belongs to the program that
+is already running.  The desktop file has the same thing as an action, so a
+right click on the launcher offers *Bucklespring preferences*, and `pkill
+-USR1 buckle-x11` does it too, for a keyboard shortcut with no dbus tooling in
+it.
+
+Closing the window leaves the clicks running; *Quit* is next to it for
+stopping the program altogether.  Nothing opens it by itself: an unasked-for
+window at login would be worse than no icon.
 
 #### Starting it automatically
 
@@ -223,6 +255,8 @@ Options:
                             side, extra, wheel, hwheel, all, none
   -h, --help                show help
   -l, --list-devices        list available OpenAL audio devices
+      --preferences         open the preferences window of the
+                            running bucklespring
   -p, --audio-path=PATH     load .wav files from directory PATH
   -r, --no-repeat           stay silent while a held key auto repeats
       --repeat-delay=MS     wait MS before the first repeat, overriding

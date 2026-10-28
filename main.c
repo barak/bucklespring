@@ -140,6 +140,7 @@ enum {
 	OPT_REPEAT_DELAY = 256,
 	OPT_REPEAT_RATE,
 	OPT_NO_TRAY,
+	OPT_PREFERENCES,
 };
 
 static const char short_opts[] = "d:fg:hlm:Mp:rs:c::vV";
@@ -150,6 +151,7 @@ static const struct option long_opts[] = {
 	{ "gain",           required_argument, NULL, 'g' },
 	{ "help",           no_argument,       NULL, 'h' },
 	{ "list-devices",   no_argument,       NULL, 'l' },
+	{ "preferences",    no_argument,       NULL, OPT_PREFERENCES },
 	{ "mute-keycode",   required_argument, NULL, 'm' },
 	{ "mute",           no_argument,       NULL, 'M' },
 	{ "audio-path",     required_argument, NULL, 'p' },
@@ -200,6 +202,18 @@ int main(int argc, char **argv)
 			case 'l':
 				list_devices();
 				return 0;
+			case OPT_PREFERENCES:
+#ifdef HAVE_TRAY
+				/* Nothing of this process but the asking: the
+				 * window belongs to the program that is
+				 * already running and holding the sound. */
+
+				return tray_show_running() == 0 ? 0 : 1;
+#else
+				fprintf(stderr, "%s was built without the "
+						"tray and its window\n", argv[0]);
+				return 1;
+#endif
 			case 'm':
 				opt_mute_keycode = strtol(optarg, NULL, 0);
 				break;
@@ -330,6 +344,8 @@ static void usage(char *exe, int status)
 		"                            side, extra, wheel, hwheel, all, none\n"
 		"  -h, --help                show help\n"
 		"  -l, --list-devices        list available OpenAL audio devices\n"
+		"      --preferences         open the preferences window of the\n"
+		"                            running bucklespring\n"
 		"  -p, --audio-path=PATH     load .wav files from directory PATH\n"
 		"  -r, --no-repeat           stay silent while a held key auto repeats\n"
 		"      --repeat-delay=MS     wait MS before the first repeat, overriding\n"
