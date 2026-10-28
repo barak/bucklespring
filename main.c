@@ -96,7 +96,14 @@ static double midloc[] = {
 	6.5,
 	6.5,
 	4.5,
+	7.5,
 };
+
+/* One centre per row of keyloc, or find_key_loc() reads off the end of this
+ * one.  The arrow cluster, the last row, had no entry of its own. */
+
+_Static_assert(sizeof midloc / sizeof *midloc == sizeof keyloc / sizeof *keyloc,
+		"keyloc and midloc must have the same number of rows");
 
 static int opt_verbose = 0;
 static int opt_stereo_width = 50;
@@ -780,7 +787,7 @@ static double find_key_loc(int code)
 	int row;
 	int col, keycol = 0;
 
-	for(row=0; row<8; row++) {
+	for(row=0; row < (int)(sizeof keyloc / sizeof *keyloc); row++) {
 		for(col=0; col<32; col++) {
 			if(keyloc[row][col] == code) keycol = col+1;
 			if(keyloc[row][col] == -1) break;
