@@ -18,11 +18,22 @@ ConditionPathExists=@sysconfdir@/bucklespring/uaccess
 
 [Service]
 Type=exec
-ExecStart=@bindir@/buckle-libinput
+# -f borrows a clip for any key the chosen set has nothing for.  Several of the
+# sets cover only the keys someone sat down and recorded, and none of them
+# covers the media keys, so without this a good deal of the keyboard is silent.
+# The tray menu has the same switch, and "systemctl --user edit buckle-libinput"
+# takes it away for good.
+ExecStart=@bindir@/buckle-libinput -f
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
+# ProtectSystem=strict makes everything read-only, the user's own runtime
+# directory included, and GTK wants to write a dconf cache into it.  Without
+# this the journal collects a hundred "dconf will not work properly" lines
+# every time the service starts.  It is the user's own directory, so handing
+# it back costs none of the protection that line is there for.
+ReadWritePaths=%t
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true

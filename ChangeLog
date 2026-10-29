@@ -1,0 +1,137 @@
+This file begins at 2.0.0.  What came before it is in the git history.
+
+
+2.0.0
+=====
+
+Five years since 1.5.1, and a major version rather than a point release.
+
+Building
+
+  * autoconf and automake replace the hand-written Makefile, so the usual
+    ./configure && make && make install works, and a release tarball
+    builds without any of the autotools installed.  From a git checkout,
+    run autoreconf -i once first.
+
+  * One executable per source of key events -- buckle-x11,
+    buckle-libinput, buckle-mac, buckle-windows -- rather than one binary
+    with the backend chosen at build time.  A machine can want more than
+    one: an X session and a Wayland session on the same box reach for a
+    different one.  configure builds each whose libraries it finds;
+    --enable-x11 and the like insist rather than let a missing library
+    quietly turn one off.
+
+  * make install also installs the man pages, the desktop files, the
+    systemd user units and the udev rule for /dev/input, all of which
+    were carried as Debian packaging before.
+
+  * Clips are read with libsndfile rather than alure, which has not moved
+    since 1.2, its author having replaced it with a C++ rewrite.
+
+  * Cross builds no longer reach for the build machine's pkg-config.
+
+Clip sets
+
+  * The samples live in clips/<set>/, one directory per set, rather than
+    in a single wav/ directory.  --list-clips says which are installed,
+    --clips=NAME picks one, and the set can be changed while the program
+    runs.  -p PATH still points straight at a directory of clips, for a
+    set that is not installed with the others.
+
+  * Seven sets are shipped: the IBM Model M recordings the project began
+    with; vain's full QWERTZ layout, from the samplesets branch;
+    SequentialDesign's recordings; mejs's single beep, for a Model M with
+    its PC speaker wired up; and piano, drums and slapstick, synthesised
+    by tools/make-clips.py, which is in the tree and can remake or alter
+    any of them.
+
+  * A set may hold several recordings of the same key, named XX-Y-Z.ext,
+    and one is picked at random for each press.  That is what stops a
+    held or repeated key sounding like a loop of one click.
+
+  * --fallback-sound, -f, borrows a clip for a key the chosen set has no
+    recording of: the set's own generic click first, so it still sounds
+    like the set that was chosen, then the same key from the set shipped
+    here, then that set's generic click.  Without it such a key is
+    silent, and most of the sets cover only part of the keyboard.  Both
+    systemd user units pass it.
+
+  * Clips may be .flac, .wav, .ogg or .opus.  The sets shipped here are
+    FLAC, lossless and a little under half the size of the same samples
+    as wav.  Anything with more than one channel is mixed down to mono,
+    because OpenAL positions only single-channel buffers.
+
+Sound
+
+  * --hrtf applies OpenAL's head-related transfer functions, so that the
+    keys sound placed around you on headphones rather than panned between
+    the ears.  on, off, or auto, the default, which leaves the decision
+    to OpenAL.
+
+  * The mouse clicks as well as the keyboard: the buttons, and the scroll
+    wheel, one sound per detent.  --no-click now takes a list -- left,
+    middle, right, side, extra, wheel, hwheel, all, none -- so some can
+    be silenced and not others.
+
+  * A key held down long enough to repeat clicks for every repeat.
+    --no-repeat goes back to one click however long it is held, and
+    --repeat-delay and --repeat-rate override what the compositor or the
+    input device says.
+
+Tray icon and preferences window
+
+  * Where GTK 3 and libayatana-appindicator are found at build time,
+    buckle puts an icon in the system tray, with Pause, Preferences and
+    Quit.  Rolling the mouse wheel over it changes the volume.  --no-tray
+    leaves it out for one run.  The icon is a StatusNotifierItem: KDE
+    Plasma shows those as they are, GNOME Shell needs an extension, and
+    where nothing is listening the icon simply does not appear.
+
+  * A preferences window holds the volume, the clip set, the audio
+    device, the fallback sound and the headphone filter, all of which
+    change while the program runs.  A menu on a tray icon travels over
+    dbusmenu, which carries labels and check marks rather than widgets;
+    a window has a slider and two combo boxes instead.
+
+  * The window opens from the menu, from "buckle-x11 --preferences"
+    against the program already running, from the desktop file's
+    Bucklespring preferences action, or on SIGUSR1.  So a desktop with
+    nothing listening for the tray icon still reaches every setting.
+
+  * The audio device list is kept up to date, so a headset plugged in
+    while the window is open appears in it.
+
+Fixes
+
+  * buckle-libinput no longer dies on a key code of 0x100 or more, which
+    the Fn and media keys of a bluetooth keyboard send: the clip table
+    stopped at 0xff and a press of one of those wrote past the end of it,
+    for a dependable SIGSEGV within seconds of starting.  Those keys have
+    clips of their own now.
+
+  * Playing a key no longer takes an OpenAL source of its own and keeps it.
+    With several recordings to a key that exhausted the 256 sources OpenAL
+    Soft allows some forty keys into a session, and the program stopped with
+    "source generation".  Clips are played through a pool of voices taken in
+    turn instead.
+
+  * The arrow key row had no entry of its own in the table saying where
+    the middle of each row is, and read one past the end of it instead.
+
+  * The listener faced away from the keyboard, with the x and z of every
+    source negated to suit, so the two mistakes cancelled.  Stereo
+    panning cannot tell front from back, so it never showed; HRTF would
+    have.
+
+  * The tray icon no longer leaves a deprecation warning and a
+    Gtk-CRITICAL in the journal on every start.
+
+  * The systemd user units no longer fill the journal at every start: a
+    hundred lines of "dconf will not work properly", because
+    ProtectSystem=strict left the user's own runtime directory read-only,
+    and a failure per input device the udev rule here does not hand over,
+    which is the rule working as designed.
+
+Elsewhere
+
+  * --version.  --help prints to stdout rather than stderr.

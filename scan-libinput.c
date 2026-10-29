@@ -16,16 +16,29 @@
 
 static void kernel_repeat_from(int fd);
 
+/* How many of the seat's input devices we were actually allowed to read. */
+static int devices_opened = 0;
+
 
 static int open_restricted(const char *path, int flags, void *user_data)
 {
 	int fd = open(path, flags);
 
+	/*
+	 * libinput asks for every input device on the seat, while the udev
+	 * rule shipped with this program hands over only the keyboards and
+	 * the pointers.  Being refused the rest is the arrangement working,
+	 * not a fault, so it is not worth a line of its own on every start.
+	 * What is worth saying is being refused all of them, which scan()
+	 * does once it knows.
+	 */
+
 	if(fd < 0) {
-		fprintf(stderr, "Failed to open %s (%s)\n", path, strerror(errno));
+		printd("Cannot open %s (%s)", path, strerror(errno));
 		return -errno;
 	}
 
+	devices_opened++;
 	kernel_repeat_from(fd);
 
 	return fd;
@@ -338,6 +351,15 @@ int scan(int verbose)
 	}
 
 	libinput_dispatch(li);
+
+	if(devices_opened == 0) {
+		fprintf(stderr,
+			"No input device could be opened, so nothing will be "
+			"heard.\n"
+			"The devices in /dev/input are not readable by ordinary "
+			"users; the udev rule\nshipped with this program grants "
+			"the access, and does nothing until it is armed.\n");
+	}
 
 	/* The compositor, if there is one, is polled alongside the input
 	 * devices so that a change to the repeat setting is picked up while

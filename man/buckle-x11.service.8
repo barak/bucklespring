@@ -1,4 +1,4 @@
-.TH BUCKLE\-X11.SERVICE "8" "September 2026" "Nostalgia bucklespring keyboard sound" "System Manager Configuration"
+.TH BUCKLE\-X11.SERVICE "8" "October 2026" "Nostalgia bucklespring keyboard sound" "System Manager Configuration"
 .SH NAME
 buckle\-x11.service \- systemd user unit for the bucklespring keyboard sound
 .SH SYNOPSIS
@@ -24,6 +24,36 @@ with
 and undo that with
 .BR "systemctl \-\-user disable \-\-now buckle\-x11" .
 Neither needs root.
+.SH OPTIONS
+The unit runs
+.BR buckle\-x11 (1)
+with
+.BR \-\-fallback\-sound ,
+so that a key the chosen clip set has no recording for borrows one instead of
+staying silent.  Several of the sets cover only the keys somebody sat down and
+recorded, and none of them covers the media keys, so without it a good deal of
+the keyboard makes no sound.  The preferences window carries the same switch,
+under
+.IR "Fallback sound for unknown keys" ;
+the tray icon's menu opens that window, and so does
+.PP
+.RS
+.B buckle\-x11 \-\-preferences
+.RE
+.PP
+on a desktop that has nowhere to put a tray icon.
+.PP
+To run it with something else, or with nothing, put an
+.I ExecStart=
+of your own in a drop-in made with
+.PP
+.RS
+.B systemctl \-\-user edit buckle\-x11
+.RE
+.PP
+remembering that
+.I ExecStart=
+has to be cleared with an empty assignment before it can be set again.
 .SH SESSION LIFETIME
 The unit is wanted by
 .IR graphical\-session.target ,

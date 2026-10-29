@@ -23,6 +23,17 @@ int play(int code, int press);
 
 int mouse_enabled(int which);
 
+/* What --hrtf was set to, and what the tray can set it to. */
+
+#define HRTF_AUTO	0
+#define HRTF_ON		1
+#define HRTF_OFF	2
+
+int buckle_hrtf_supported(void);
+int buckle_hrtf_setting(void);
+int buckle_hrtf_active(void);
+int buckle_set_hrtf(int setting);
+
 /* What the tray drives the program through; all of it is thread safe. */
 
 int buckle_muted(void);
@@ -32,6 +43,20 @@ void buckle_set_gain(int gain);
 int buckle_mute_keycode(void);
 const char *buckle_audio_device(void);
 int buckle_set_audio_device(const char *name);
+/* The clip sets: directories of wav files, one set to a directory. */
+
+char **buckle_clip_sets(void);
+void buckle_clip_sets_free(char **list);
+const char *buckle_clip_set(void);
+int buckle_set_clip_set(const char *name);
+
+/* Whether a key the set has nothing for borrows a clip, as -f asks for. */
+
+int buckle_fallback(void);
+void buckle_set_fallback(int on);
+
+int buckle_audio_connected(void);
+int buckle_audio_recover(void);
 char **buckle_audio_devices(void);
 void buckle_audio_devices_free(char **list);
 void buckle_quit(void);
@@ -40,6 +65,11 @@ void buckle_quit(void);
 
 int tray_init(void);
 void tray_run(void);
+
+/* Ask the bucklespring already running for its preferences window; what
+ * --preferences does, in the process started to ask.  Zero if it was shown. */
+
+int tray_show_running(void);
 int repeat_enabled(void);
 void repeat_override(int *delay_ms, int *period_ms);
 int scan(int verbose);
