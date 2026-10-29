@@ -1,0 +1,26 @@
+bucklespring-x11, the tray icon and the preferences window
+==========================================================
+
+The icon buckle puts in the system tray is a StatusNotifierItem. KDE Plasma
+shows those natively. GNOME Shell does not, and needs an extension:
+
+  # apt-get install gnome-shell-extension-appindicator
+  $ gnome-extensions enable ubuntu-appindicators@ubuntu.com
+
+The UUID is Ubuntu's, the extension having come from there. A running
+gnome-shell does not notice an extension installed underneath it, and a
+Wayland session cannot restart gnome-shell, so if that second command answers
+"Extension ... does not exist", log out and back in and run it again.
+
+Where nothing at all hosts the icon there is simply no icon; buckle says so
+under -v and otherwise carries on quietly. Nothing is lost but the icon: the
+menu on it holds only Pause and Quit and an entry that opens the preferences
+window, and that window is reachable by itself:
+
+  $ buckle-x11 --preferences
+
+asks the running buckle to put it up. The desktop file has that as an action,
+so a right click on the launcher offers "Bucklespring preferences", and
+SIGUSR1 does the same, for a keyboard shortcut.
+
+ -- Barak A. Pearlmutter <bap@debian.org>, Wed, 28 Oct 2026 17:45:00 +0000

@@ -4,7 +4,7 @@ Maintainer: Barak A. Pearlmutter <bap@debian.org>
 Build-Depends: debhelper-compat (= 14),
 	pkgconf,
 	libopenal-dev,
-	libalure-dev,
+	libsndfile1-dev,
 	libxtst-dev <!pkg.bucklespring.nox11>,
 	libinput-dev [linux-any] <!pkg.bucklespring.nolibinput>,
 	libudev-dev [linux-any] <!pkg.bucklespring.nolibinput>,
@@ -25,7 +25,9 @@ Homepage: https://github.com/zevv/bucklespring
 Package: bucklespring-libinput
 Architecture: linux-any
 Build-Profiles: <!pkg.bucklespring.nolibinput>
-Depends: ${shlibs:Depends}, ${misc:Depends}, bucklespring-data (>= ${source:Version})
+Depends: bucklespring-data (>= ${source:Version})
+Suggests: bucklespring-data-vain, bucklespring-data-sequential, bucklespring-data-synth,
+ gnome-shell-extension-appindicator
 Provides: bucklespring
 Conflicts: bucklespring (<< 1.5.1-2~)
 Replaces: bucklespring (<< 1.5.1-2~)
@@ -50,7 +52,9 @@ Description: Nostalgia bucklespring keyboard sound - libinput flavour
 Package: bucklespring-x11
 Architecture: any
 Build-Profiles: <!pkg.bucklespring.nox11>
-Depends: ${shlibs:Depends}, bucklespring-data (>= ${source:Version})
+Depends: bucklespring-data (>= ${source:Version})
+Suggests: bucklespring-data-vain, bucklespring-data-sequential, bucklespring-data-synth,
+ gnome-shell-extension-appindicator
 Provides: bucklespring
 Conflicts: bucklespring (<< 1.5.1-2~)
 Replaces: bucklespring (<< 1.5.1-2~)
@@ -82,7 +86,7 @@ Package: bucklespring-data
 Architecture: all
 Multi-Arch: foreign
 Breaks: bucklespring (<< 1.5.1-2~)
-Description: Nostalgia bucklespring keyboard sound - sound files
+Description: Nostalgia bucklespring keyboard sound - Model M clips
  Bucklespring emulates the sound of an old IBM Model-M space saver
  bucklespring keyboard while typing.
  .
@@ -92,4 +96,54 @@ Description: Nostalgia bucklespring keyboard sound - sound files
  played back while simulating the proper distance and direction for a
  realistic 3D sound palette of pure nostalgic bliss.
  .
- This package contains the keyboard sound files.
+ This package contains the IBM Model M recordings the program began with,
+ the clip set named "bucklespring". It is the set used when none is asked
+ for, and the one the other sets borrow from for keys they do not cover, so
+ every flavour needs it.
+ .
+ The alternative clip sets are in bucklespring-data-vain,
+ bucklespring-data-sequential and bucklespring-data-synth.
+
+Package: bucklespring-data-vain
+Architecture: all
+Multi-Arch: foreign
+Description: Nostalgia bucklespring keyboard sound - vain's clips
+ Bucklespring emulates the sound of an old IBM Model-M space saver
+ bucklespring keyboard while typing.
+ .
+ This package contains the clip set named "vain-qwertz": a full QWERTZ
+ layout recorded by vain, with two to four takes of every key, one of them
+ chosen at random for each press.
+ .
+ Select it with "buckle --clips=vain-qwertz" or from the preferences window.
+
+Package: bucklespring-data-sequential
+Architecture: all
+Multi-Arch: foreign
+Description: Nostalgia bucklespring keyboard sound - SequentialDesign's clips
+ Bucklespring emulates the sound of an old IBM Model-M space saver
+ bucklespring keyboard while typing.
+ .
+ This package contains the clip set named "sequential": a keyboard recorded
+ by SequentialDesign with two to four takes of every key, one of them chosen
+ at random for each press.
+ .
+ Select it with "buckle --clips=sequential" or from the preferences window.
+
+Package: bucklespring-data-synth
+Architecture: all
+Multi-Arch: foreign
+Description: Nostalgia bucklespring keyboard sound - synthesised clips
+ Bucklespring emulates the sound of an old IBM Model-M space saver
+ bucklespring keyboard while typing.
+ .
+ This package contains the clip sets which are generated rather than
+ recorded: "piano", a pentatonic scale rising from left to right across the
+ keyboard; "drums", a kick, snare, hat or tom per key; "slapstick", boings
+ and slide whistles; and "beeper", a single beep for a Model M with its PC
+ speaker wired up.
+ .
+ They are made by tools/make-clips.py in the source, so any of them can be
+ remade or altered.
+ .
+ Select one with "buckle --clips=piano" or from the preferences window.

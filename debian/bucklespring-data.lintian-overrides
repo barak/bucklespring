@@ -1,0 +1,6 @@
+# The repetition is meaningful: usr/share/bucklespring is the program's data
+# directory, and "bucklespring" within clips/ is the name of a clip set, the
+# IBM Model M recordings it began with, as against "vain-qwertz", "piano" and
+# the rest. Renaming the set would make --clips=bucklespring stop working for
+# no gain beyond quieting this.
+bucklespring-data: repeated-path-segment bucklespring [usr/share/bucklespring/clips/bucklespring/]

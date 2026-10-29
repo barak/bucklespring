@@ -2,9 +2,14 @@
 /*.log
 /*.substvars
 /.debhelper/
+/autoreconf.*
+/bucklespring-data-sequential/
+/bucklespring-data-synth/
+/bucklespring-data-vain/
 /bucklespring-data/
 /bucklespring-libinput/
 /bucklespring-x11/
 /bucklespring/
 /debhelper-build-stamp
 /files
+/tmp/

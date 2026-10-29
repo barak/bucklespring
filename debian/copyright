@@ -22,6 +22,7 @@ Files: configure.ac
        Makefile.am
        tray.c
        wl-repeat.c
+       tools/make-clips.py
        systemd/*
        udev/*
 Copyright: 2026 Barak A. Pearlmutter <bap@debian.org>
@@ -38,6 +39,41 @@ Comment: The pages for the executables are generated from their own --help
  and --version output by help2man(1); the prose around the option list, in
  the matching .h2m include files, was first written for the Debian package
  by Dominik George.
+
+Files: clips/bucklespring/*
+Copyright: 2016-2025 Ico Doornekamp <ico@zevv.nl>
+License: GPL-2+
+Comment: The IBM Model M recordings the program began with, transcoded from
+ wav to FLAC without loss.
+
+Files: clips/vain-qwertz/*
+Copyright: 2017 vain <vain@uninformativ.de>
+License: GPL-2+
+Comment: A full QWERTZ layout with two to four takes of every key,
+ contributed to the upstream project through its pull requests and carried
+ on its samplesets branch; transcoded from wav to FLAC without loss.
+
+Files: clips/sequential/*
+Copyright: 2025 SequentialDesign <https://github.com/SequentialDesign>
+License: GPL-2+
+Comment: Recorded on a fork of this project and offered through its pull
+ request 135, under no terms of their own, so taken under the project's;
+ transcoded from wav to FLAC without loss.
+
+Files: clips/beeper/*
+Copyright: 2020 mejs <https://github.com/mejs>
+License: GPL-2+
+Comment: The single beep of the beepykeyboard fork, for a Model M with its
+ PC speaker wired up.  Recorded on a fork of this project under no terms of
+ its own, so taken under the project's; transcoded without loss.
+
+Files: clips/drums/*
+       clips/piano/*
+       clips/slapstick/*
+Copyright: 2026 Barak A. Pearlmutter <bap@debian.org>
+License: GPL-2+
+Comment: Not recordings of anything: these are synthesised by
+ tools/make-clips.py, which is in the source and can remake them.
 
 Files: debian/*
 Copyright: 2016-2017 Dominik George <nik@naturalnet.de>

@@ -1,3 +1,24 @@
+bucklespring (2.0.0-1) UNRELEASED; urgency=medium
+
+  * New upstream version 2.0.0
+    - many bug fixes, including crashes
+    - many improvements
+    - upstream ChangeLog
+  * Build-depend on libsndfile1-dev rather than libalure-dev
+  * Split clip sets out of bucklespring-data, which would otherwise have
+    grown from 3 MB to 18. (Model M recordings are in bucklespring-data.
+    This is the default, so it's a hard dependency. The others borrow
+    from it for keys they don't have clips for. Other keyboard sound sets
+    are in bucklespring-data-vain, bucklespring-data-sequential and
+    bucklespring-data-synth.)
+  * Suggest gnome-shell-extension-appindicator, for a tray icon under
+    GNOME. See also README.Debian.
+  * Drop debian/patches/0001-version.patch, unnecessary.
+  * debian/copyright, updated for new keyboard sound sets.
+  * Bump to debhelper compat level 14.
+
+ -- Barak A. Pearlmutter <bap@debian.org>  Sun, 11 Oct 2026 17:09:08 +0100
+
 bucklespring (1.5.1+git.1.e41a021-2) unstable; urgency=medium
 
   * Portuguese debconf translation by Américo Monteiro (closes: #1146902)
