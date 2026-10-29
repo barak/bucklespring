@@ -64,9 +64,9 @@ $ make install clean
 To compile on debian-based linux distributions, first make sure the require
 libraries and header files are installed, then simply run `make`:
 
-Every flavour needs OpenAL and libsndfile.  `buckle-x11` needs libX11 and libXtst
-on top of that, and `buckle-libinput` needs libinput, libudev and
-libwayland-client.  The system tray icon needs GTK 3 and
+Every flavour needs OpenAL and libsndfile.  `buckle-x11` needs libX11 and
+libXtst on top of that, and `buckle-libinput` needs libinput, libudev,
+libwayland-client and libsystemd.  The system tray icon needs GTK 3 and
 libayatana-appindicator; it is left out when they are missing.  Building from
 a git checkout rather than a release tarball also needs autoconf, automake and
 pkg-config.
@@ -75,7 +75,7 @@ pkg-config.
 ```
 $ sudo apt-get install build-essential autoconf automake pkg-config \
     libopenal-dev libsndfile1-dev libxtst-dev \
-    libinput-dev libudev-dev libwayland-dev \
+    libinput-dev libudev-dev libwayland-dev libsystemd-dev \
     libgtk-3-dev libayatana-appindicator3-dev
 ```
 
@@ -133,6 +133,23 @@ $ sudo udevadm trigger --subsystem-match=input --action=change
 Read the comments in the rule before you do: that access lets any process of
 yours read every keystroke on the machine, passwords typed into other
 programs included.  Delete the flag file and trigger again to take it back.
+
+Armed, the rule hands that access to the active session on the local seat,
+and buckle holds itself to the same bargain: it asks logind which session it
+belongs to, reads the input devices of that session's seat, and does so only
+while the session is active.  Switch to another virtual console, or let
+another user take the seat, and it closes the devices again and drops what it
+had buffered along with any key it was repeating.  Logind takes its grant
+back at that moment too, but a grant is looked at when a device is opened and
+not after, so a program already holding the devices open would otherwise go
+on reading them from behind whoever has the seat now.
+
+A seated session is what it looks for, that being where the input devices
+are.  Started by your systemd user instance, as the units shipped here are,
+it is in no session of its own; in a session on no seat, an ssh login for
+one, there is nothing to read.  In both cases it falls back to the graphical
+session of the user running it, and if there is no session to be had it says
+so and stops.
 
 #### The tray icon
 

@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/poll.h>
@@ -8,6 +9,7 @@
 #include <sys/ioctl.h>
 
 #include <libinput.h>
+#include <systemd/sd-login.h>
 #include <linux/input.h>
 #include <linux/input-event-codes.h>
 
@@ -20,8 +22,67 @@ static void kernel_repeat_from(int fd);
 static int devices_opened = 0;
 
 
+/*
+ * The session this process belongs to, and the seat whose input devices that
+ * session is entitled to.  A seated session is what is wanted, that being
+ * where the input devices are: started by a systemd user instance, as the
+ * units shipped here do, there is no session of our own to find, and a
+ * session on no seat, an ssh login for one, has no input devices to offer.
+ * Either way the graphical session of the user running us is the one meant,
+ * so it is asked for next.
+ */
+
+static int session_and_seat(char **session, char **seat)
+{
+	uid_t uid;
+	int r;
+
+	if(sd_pid_get_session(0, session) >= 0) {
+		r = sd_session_get_seat(*session, seat);
+		if(r >= 0) {
+			return r;
+		}
+		free(*session);
+		*session = NULL;
+	}
+
+	r = sd_pid_get_owner_uid(0, &uid);
+	if(r < 0) {
+		return r;
+	}
+	r = sd_uid_get_display(uid, session);
+	if(r < 0) {
+		return r;
+	}
+
+	return sd_session_get_seat(*session, seat);
+}
+
+
+/*
+ * Whether what scan() last learned about the session still holds.  The login
+ * monitor becomes readable when anything about any session changes and
+ * nothing else makes it so, which makes a poll of it the cheap way to ask:
+ * sd_session_is_active() opens and parses the session's file under /run, and
+ * is for the main loop, once per change, rather than once per keystroke.
+ */
+
+static int session_unchanged(int monitor_fd)
+{
+	struct pollfd monitor = { .fd = monitor_fd, .events = POLLIN };
+	int r = poll(&monitor, 1, 0);
+
+	if(r < 0)
+		return -errno;
+	return r > 0 ? 0 : 1;
+}
+
+
 static int open_restricted(const char *path, int flags, void *user_data)
 {
+	if(sd_session_is_active(user_data) <= 0)
+		return -EACCES;
+
 	int fd = open(path, flags);
 
 	/*
@@ -126,6 +187,9 @@ static void repeat_refresh(void)
 
 	repeat_delay_ms = delay;
 	repeat_period_ms = period;
+	if(period <= 0) {
+		repeat_key = -1;
+	}
 
 	printd("Key repeat: %d ms delay, %d ms period", delay, period);
 }
@@ -189,6 +253,22 @@ static int repeat_timeout(void)
 	   + (repeat_at.tv_nsec - now.tv_nsec) / 1000000;
 
 	return ms > 0 ? (int)ms : 0;
+}
+
+
+static int repeat_dispatch(int monitor_fd)
+{
+	if(repeat_key < 0 || repeat_timeout() > 0)
+		return 0;
+
+	int r = session_unchanged(monitor_fd);
+	if(r > 0) {
+		play(repeat_key, 1);
+		repeat_after(repeat_period_ms);
+	} else {
+		repeat_key = -1;
+	}
+	return r < 0 ? r : 0;
 }
 
 
@@ -288,15 +368,30 @@ static void handle_scroll(struct libinput_event *ev)
 }
 
 
-static void handle_events(struct libinput *li)
+static int handle_events(struct libinput *li, int monitor_fd)
 {
 	struct libinput_event *ev;
 		
 	libinput_dispatch(li);
 
 	while((ev = libinput_get_event(li))) {
+		enum libinput_event_type type = libinput_event_get_type(ev);
+		if(type != LIBINPUT_EVENT_KEYBOARD_KEY &&
+		   type != LIBINPUT_EVENT_POINTER_BUTTON &&
+		   type != LIBINPUT_EVENT_POINTER_SCROLL_WHEEL) {
+			libinput_event_destroy(ev);
+			libinput_dispatch(li);
+			continue;
+		}
 
-		switch(libinput_event_get_type(ev)) {
+		int r = session_unchanged(monitor_fd);
+		if(r <= 0) {
+			repeat_key = -1;
+			libinput_event_destroy(ev);
+			return r;
+		}
+
+		switch(type) {
 			case LIBINPUT_EVENT_KEYBOARD_KEY:
 				handle_key(ev);
 				break;
@@ -313,6 +408,18 @@ static void handle_events(struct libinput *li)
 		libinput_event_destroy(ev);
 		libinput_dispatch(li);
 	}
+	return 0;
+}
+
+
+static void suspend_input(struct libinput *li)
+{
+	struct libinput_event *ev;
+
+	repeat_key = -1;
+	libinput_suspend(li);
+	while((ev = libinput_get_event(li)))
+		libinput_event_destroy(ev);
 }
 
 
@@ -325,19 +432,38 @@ static void log_handler(struct libinput *li, enum libinput_log_priority priority
 
 int scan(int verbose)
 {
-	struct udev *udev;
-	struct libinput *li;
+	struct udev *udev = NULL;
+	struct libinput *li = NULL;
+	sd_login_monitor *monitor = NULL;
+	char *session = NULL, *seat = NULL;
+	int active = 1;
+	int first = 1;
+	int r;
+
+	r = session_and_seat(&session, &seat);
+	if(r < 0)
+		goto session_error;
+	r = sd_login_monitor_new("session", &monitor);
+	if(r < 0)
+		goto session_error;
+
+	int monitor_fd = sd_login_monitor_get_fd(monitor);
+	int monitor_events = sd_login_monitor_get_events(monitor);
+	if(monitor_fd < 0 || monitor_events < 0) {
+		r = monitor_fd < 0 ? monitor_fd : monitor_events;
+		goto session_error;
+	}
 
 	udev = udev_new();
-        if (!udev) {
-                fprintf(stderr, "Failed to initialize udev\n");
-                return -1;
-        }
+	if(!udev) {
+		fprintf(stderr, "Failed to initialize udev\n");
+		goto out;
+	}
 
-	li = libinput_udev_create_context(&interface, NULL, udev);
+	li = libinput_udev_create_context(&interface, session, udev);
 	if(!li) {
 		fprintf(stderr, "Failed to initialize context\n");
-		return -1;
+		goto out;
 	}
 
 	if(verbose) {
@@ -345,14 +471,16 @@ int scan(int verbose)
 		libinput_log_set_priority(li, LIBINPUT_LOG_PRIORITY_DEBUG);
 	}
 
-	if (libinput_udev_assign_seat(li, "seat0")) {
+	if(libinput_udev_assign_seat(li, seat)) {
 		fprintf(stderr, "Failed to set seat\n");
-		return -1;
+		goto out;
 	}
 
-	libinput_dispatch(li);
+	/* While the session is inactive open_restricted refuses every device
+	 * by design, which is the arrangement working rather than a fault, so
+	 * the complaint is only worth making when the session is active. */
 
-	if(devices_opened == 0) {
+	if(devices_opened == 0 && sd_session_is_active(session) > 0) {
 		fprintf(stderr,
 			"No input device could be opened, so nothing will be "
 			"heard.\n"
@@ -365,48 +493,87 @@ int scan(int verbose)
 	 * devices so that a change to the repeat setting is picked up while
 	 * we are running rather than only at startup. */
 
-	struct pollfd fds[2];
-	int nfds = 1;
-
-	fds[0].fd = libinput_get_fd(li);
-	fds[0].events = POLLIN;
-	fds[0].revents = 0;
-
-	fds[1].fd = wl_repeat_open();
-	fds[1].events = POLLIN;
-	fds[1].revents = 0;
-	if(fds[1].fd >= 0) {
-		nfds = 2;
-	}
+	struct pollfd fds[] = {
+		{ .fd = libinput_get_fd(li), .events = POLLIN },
+		{ .fd = wl_repeat_open(), .events = POLLIN },
+		{ .fd = monitor_fd, .events = monitor_events },
+	};
 
 	repeat_refresh();
 
-	while(poll(fds, nfds, repeat_timeout()) > -1) {
+	for(;;) {
+		if(fds[2].revents) {
+			/* Switches can coalesce; discard input even if active again. */
+			suspend_input(li);
+			active = 0;
+			r = sd_login_monitor_flush(monitor);
+			if(r < 0)
+				goto session_error;
+		}
+
+		if(first || fds[2].revents) {
+			first = 0;
+			r = sd_session_is_active(session);
+			if(r < 0)
+				goto session_error;
+			if(!!r != active) {
+				active = !!r;
+				if(active) {
+					if(libinput_resume(li) < 0) {
+						fprintf(stderr, "Failed to resume input devices\n");
+						goto out;
+					}
+				} else {
+					suspend_input(li);
+				}
+			}
+		}
 
 		/* POLLHUP and friends matter as much as POLLIN here: once the
 		 * connection is gone its descriptor is closed, and polling a
 		 * closed descriptor would spin on POLLNVAL. */
 
-		if(nfds == 2 && fds[1].revents != 0) {
+		if(fds[1].fd >= 0 && fds[1].revents != 0) {
 			if(!wl_repeat_dispatch()) {
-				nfds = 1;
+				fds[1].fd = -1;
 			}
 			repeat_refresh();
 		}
 
-		if(repeat_key >= 0 && repeat_timeout() == 0) {
-			play(repeat_key, 1);
-			repeat_after(repeat_period_ms);
+		if(active) {
+			r = repeat_dispatch(monitor_fd);
+			if(r < 0)
+				goto session_error;
+			r = handle_events(li, monitor_fd);
+			if(r < 0)
+				goto session_error;
 		}
 
-		handle_events(li);
+		do {
+			r = poll(fds, 3, active ? repeat_timeout() : -1);
+		} while(r < 0 && errno == EINTR);
+		if(r < 0) {
+			r = -errno;
+			goto session_error;
+		}
+		if((fds[0].revents | fds[2].revents) & (POLLERR | POLLHUP | POLLNVAL)) {
+			r = -EIO;
+			goto session_error;
+		}
 	}
 
-	return 0;
+session_error:
+	fprintf(stderr, "Failed to monitor login session: %s\n", strerror(-r));
+out:
+	if(li) libinput_unref(li);
+	if(udev) udev_unref(udev);
+	sd_login_monitor_unref(monitor);
+	free(seat);
+	free(session);
+	return -1;
 }
 
 
 void open_console(void)
 {
 }
-
