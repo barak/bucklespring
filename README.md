@@ -160,7 +160,7 @@ an icon in the system tray.  Its menu is short on purpose:
 Pause  (ScrollLock × 2)
 —
 Preferences
-Quit Bucklespring 2.0.0
+Quit Bucklespring 2.0.1
 ```
 
 Pause and quit are the two things worth doing in one click, and everything

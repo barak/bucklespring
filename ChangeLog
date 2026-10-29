@@ -1,6 +1,37 @@
 This file begins at 2.0.0.  What came before it is in the git history.
 
 
+2.0.1
+=====
+
+Fixes, most of them from David Csiki's fork.
+
+  * buckle-libinput reads the input devices of its own login session's
+    seat, and only while that session is active.  Switching to another
+    virtual console, or handing the seat to another user, closes the
+    devices again and drops what was buffered along with any key being
+    repeated.  The udev rule has logind grant that access to the active
+    local session and take it back afterwards, but a grant is looked at
+    when a device is opened and not after, so a buckle-libinput already
+    running had gone on reading the keyboard from behind whoever held
+    the seat next.  The seat is now asked of logind rather than assumed
+    to be seat0, and so is the session: the graphical session of the
+    user running it, where that is a systemd user unit or a login with
+    no seat of its own.  This flavour needs libsystemd accordingly.
+
+  * buckle-x11 asked XRecord for the event types from KeyPress to
+    ButtonReleaseMask, a mask where a type belonged, and was handed
+    MotionNotify, EnterNotify and LeaveNotify along with the keys and
+    buttons it wanted: every pointer motion on the display travelled
+    through the RECORD connection only to be thrown away.
+
+  * A key held down while the repeat rate went to zero kept repeating,
+    the rate being looked at only when the key went down.
+
+  * make check runs what tests there are, which for now is the session
+    handling of the libinput flavour.
+
+
 2.0.0
 =====
 
