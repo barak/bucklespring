@@ -501,7 +501,6 @@ static int audio_open(const char *name)
 	alListener3f(AL_POSITION, 0, 0, 0);
 	alListener3f(AL_VELOCITY, 0, 0, 0);
 	alListenerfv(AL_ORIENTATION, ori);
-	alListenerf(AL_GAIN, opt_gain / 100.0);
 	audio_load_buffers();
 
 	return 0;
@@ -656,15 +655,22 @@ int buckle_gain(void)
 }
 
 
+/* The gain is set on a source when it is first made, so the sources that
+ * already exist have to be told again. */
+
 void buckle_set_gain(int gain)
 {
+	size_t i;
+
 	if(gain < 0) { gain = 0; }
 	if(gain > 100) { gain = 100; }
 
 	pthread_mutex_lock(&audio_lock);
 	opt_gain = gain;
-	if(context != NULL) {
-		alListenerf(AL_GAIN, opt_gain / 100.0);
+	for(i = 0; i < sizeof src / sizeof *src; i++) {
+		if(src[i] != 0 && src[i] != SRC_INVALID) {
+			alSourcef(src[i], AL_GAIN, opt_gain / 100.0);
+		}
 	}
 	pthread_mutex_unlock(&audio_lock);
 }
@@ -879,6 +885,8 @@ int play(int code, int press)
 		if (opt_stereo_width > 0) {
 			alSource3f(src[idx], AL_POSITION, -x, 0, (100 - opt_stereo_width) / 100.0);
 		}
+		alSourcef(src[idx], AL_GAIN, opt_gain / 100.0);
+
 		alSourcei(src[idx], AL_BUFFER, buffer);
 		TEST_ERROR("buffer binding");
 	}
