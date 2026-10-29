@@ -31,6 +31,12 @@ Comment: The build system, the system tray icon, the Wayland repeat rate
  query, the systemd user units and the uaccess udev rule began as Debian
  packaging and have since moved upstream.
 
+Files: tests/*
+Copyright: 2026 David Csiki <csdivad@gmail.com>
+License: GPL-2+
+Comment: The test for the libinput flavour's login session handling, from
+ the fork where that handling was written.
+
 Files: man/*
 Copyright: 2016-2017 Dominik George <nik@naturalnet.de>
            2026 Barak A. Pearlmutter <bap@debian.org>

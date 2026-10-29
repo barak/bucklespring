@@ -1,3 +1,17 @@
+bucklespring (2.0.1-1) UNRELEASED; urgency=medium
+
+  * New upstream version 2.0.1
+    - buckle-libinput reads the input devices of its own login session's
+      seat, and only while that session is active
+    - upstream ChangeLog
+  * Build-depend on libsystemd-dev, for the above.
+  * README.Debian: revoking the udev grant does not reach a program that
+    already has the devices open, which is what the above is for; and the
+    input group is no longer an alternative for this flavour, which now
+    needs logind either way.
+
+ -- Barak A. Pearlmutter <bap@debian.org>  Thu, 29 Oct 2026 22:39:02 +0000
+
 bucklespring (2.0.0-1) unstable; urgency=medium
 
   * New upstream version 2.0.0

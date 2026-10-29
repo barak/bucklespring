@@ -31,6 +31,15 @@ systemd-logind put an ACL on them for the user who is physically logged in at
 the local seat. Access is limited to that active local session and is revoked
 at logout, so remote or background users of the machine do not get it.
 
+An ACL is looked at when a device is opened and not afterwards, so revoking it
+does not reach a program that already has the device open. buckle-libinput
+therefore holds itself to the same bargain the rule makes, whichever way the
+access was granted: it asks logind which session it belongs to, reads the
+input devices of that session's seat, and closes them again whenever the
+session is not the active one. Switch to another virtual console, or hand the
+seat to another user, and it stops reading the keyboard and drops whatever it
+had buffered.
+
 The rule does nothing until you enable it, and enabling it is a flag file
 rather than a copy of the rule. Installing the package asks whether to turn it
 on, at medium debconf priority and defaulting to no; to change that answer
@@ -197,8 +206,11 @@ Alternative: the input group
   # adduser <user> input
 
 This is coarser: it applies to all of that user's processes at all times,
-local session or not, so the uaccess rule above is preferable. It is however
-the only option on a system without systemd-logind or elogind.
+local session or not, so the uaccess rule above is preferable. It also no
+longer gets you anywhere on a system without systemd-logind or elogind: as of
+2.0.1 buckle-libinput asks logind for its session and seat, and stops if
+there is no answer, so that flavour needs one of the two whatever the
+permissions on the devices say. buckle-x11 does not.
 
 Why the binary is not setgid or capability marked
 -------------------------------------------------
@@ -221,9 +233,13 @@ bucklespring executable enough to be a trustworthy setgid program would entail
 considerable effort. Granting the access to the seat-local user through udev
 has a smaller vulnerability surface.
 
-Note that buckle-libinput prints "Failed to open /dev/input/eventN (Permission
-denied)" on startup for the input devices the rule above does not cover, and
-libinput just skips those. The message is harmless.
+Note that libinput asks for every input device on the seat while the rule
+above hands over only the keyboards and the pointers, and simply skips the
+rest; being refused those is the rule working rather than a fault, and is
+only mentioned under -v. Being refused all of them is worth saying, and
+buckle-libinput says so once, on startup, naming the rule. It keeps that to
+itself while its session is inactive, where every device is refused by
+design.
 
 The tray icon and the preferences window
 ----------------------------------------
