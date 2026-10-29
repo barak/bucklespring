@@ -56,16 +56,22 @@ static int session_and_seat(char **session, char **seat)
 }
 
 
-static int session_ready(const char *session, int monitor_fd)
+/*
+ * Whether what scan() last learned about the session still holds.  The login
+ * monitor becomes readable when anything about any session changes and
+ * nothing else makes it so, which makes a poll of it the cheap way to ask:
+ * sd_session_is_active() opens and parses the session's file under /run, and
+ * is for the main loop, once per change, rather than once per keystroke.
+ */
+
+static int session_unchanged(int monitor_fd)
 {
 	struct pollfd monitor = { .fd = monitor_fd, .events = POLLIN };
 	int r = poll(&monitor, 1, 0);
 
 	if(r < 0)
 		return -errno;
-	if(r > 0)
-		return 0;
-	return sd_session_is_active(session);
+	return r > 0 ? 0 : 1;
 }
 
 
@@ -237,12 +243,12 @@ static int repeat_timeout(void)
 }
 
 
-static int repeat_dispatch(const char *session, int monitor_fd)
+static int repeat_dispatch(int monitor_fd)
 {
 	if(repeat_key < 0 || repeat_timeout() > 0)
 		return 0;
 
-	int r = session_ready(session, monitor_fd);
+	int r = session_unchanged(monitor_fd);
 	if(r > 0) {
 		play(repeat_key, 1);
 		repeat_after(repeat_period_ms);
@@ -349,7 +355,7 @@ static void handle_scroll(struct libinput_event *ev)
 }
 
 
-static int handle_events(struct libinput *li, const char *session, int monitor_fd)
+static int handle_events(struct libinput *li, int monitor_fd)
 {
 	struct libinput_event *ev;
 		
@@ -365,7 +371,7 @@ static int handle_events(struct libinput *li, const char *session, int monitor_f
 			continue;
 		}
 
-		int r = session_ready(session, monitor_fd);
+		int r = session_unchanged(monitor_fd);
 		if(r <= 0) {
 			repeat_key = -1;
 			libinput_event_destroy(ev);
@@ -509,10 +515,10 @@ int scan(int verbose)
 		}
 
 		if(active) {
-			r = repeat_dispatch(session, monitor_fd);
+			r = repeat_dispatch(monitor_fd);
 			if(r < 0)
 				goto session_error;
-			r = handle_events(li, session, monitor_fd);
+			r = handle_events(li, monitor_fd);
 			if(r < 0)
 				goto session_error;
 		}
