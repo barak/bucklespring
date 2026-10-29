@@ -5,8 +5,9 @@
 #
 # Access is handed out by systemd-logind as a POSIX ACL on the device, is
 # limited to the active local session, and is revoked again at logout.
-# ACL changes do not revoke already-open descriptors; buckle-libinput closes
-# its own input devices while its login session is inactive.
+# An ACL is looked at when a device is opened and not after, so revoking it
+# does not reach a program that already has the device open; buckle-libinput
+# closes its own input devices while its login session is inactive.
 #
 # This rule does nothing until the administrator creates the flag file
 # @sysconfdir@/bucklespring/uaccess:

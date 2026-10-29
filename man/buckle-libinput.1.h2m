@@ -30,12 +30,19 @@ with this flavour,
 grants that access to the user at the local seat, and is inert until armed;
 read the comments in it for how, and for what it costs you.
 .PP
-It requires a local login session managed by systemd-logind and uses that
-session's seat. Input devices are closed while the session is inactive;
-buffered events and key repeats are discarded when the session changes.
-When started as a user service outside a login session, it uses the user's
-primary graphical session. It refuses to capture input if no session or seat
-can be identified.
+Armed, that rule hands the access to the active session on the local seat,
+and this flavour holds itself to the same bargain: it asks logind which
+session it belongs to, reads the input devices of that session's seat, and
+does so only while the session is active, closing them again and dropping
+what it had buffered when the seat goes to someone else.  A udev grant is
+looked at when a device is opened and not after, so a program already holding
+them open would otherwise go on reading them.
+.PP
+A seated session is what it looks for, that being where the input devices
+are.  Started by a systemd user instance there is no session of its own to
+find, and a session on no seat, an ssh login for one, has nothing to read;
+in both cases it falls back to the graphical session of the user running it,
+and stops if there is none.
 .PP
 libinput discards the key repeat the kernel generates for a held key and
 leaves repeating to its caller, so this flavour keeps its own clock.  Nothing

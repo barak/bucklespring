@@ -19,6 +19,43 @@
 static void kernel_repeat_from(int fd);
 
 
+/*
+ * The session this process belongs to, and the seat whose input devices that
+ * session is entitled to.  A seated session is what is wanted, that being
+ * where the input devices are: started by a systemd user instance, as the
+ * units shipped here do, there is no session of our own to find, and a
+ * session on no seat, an ssh login for one, has no input devices to offer.
+ * Either way the graphical session of the user running us is the one meant,
+ * so it is asked for next.
+ */
+
+static int session_and_seat(char **session, char **seat)
+{
+	uid_t uid;
+	int r;
+
+	if(sd_pid_get_session(0, session) >= 0) {
+		r = sd_session_get_seat(*session, seat);
+		if(r >= 0) {
+			return r;
+		}
+		free(*session);
+		*session = NULL;
+	}
+
+	r = sd_pid_get_owner_uid(0, &uid);
+	if(r < 0) {
+		return r;
+	}
+	r = sd_uid_get_display(uid, session);
+	if(r < 0) {
+		return r;
+	}
+
+	return sd_session_get_seat(*session, seat);
+}
+
+
 static int session_ready(const char *session, int monitor_fd)
 {
 	struct pollfd monitor = { .fd = monitor_fd, .events = POLLIN };
@@ -384,16 +421,7 @@ int scan(int verbose)
 	int first = 1;
 	int r;
 
-	r = sd_pid_get_session(0, &session);
-	if(r < 0) {
-		uid_t uid;
-		r = sd_pid_get_owner_uid(0, &uid);
-		if(r >= 0)
-			r = sd_uid_get_display(uid, &session);
-	}
-	if(r < 0)
-		goto session_error;
-	r = sd_session_get_seat(session, &seat);
+	r = session_and_seat(&session, &seat);
 	if(r < 0)
 		goto session_error;
 	r = sd_login_monitor_new("session", &monitor);

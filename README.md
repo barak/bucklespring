@@ -119,13 +119,6 @@ turn it off.  The same goes for `--enable-tray` and `--disable-tray`.
 
 #### Reading the input devices
 
-`buckle-libinput` requires a local login session managed by systemd-logind.
-It uses that session's seat, closes input devices while the session is
-inactive, and discards buffered events and key repeats when the session
-changes. When started as a user service outside a login session, it uses the
-user's primary graphical session. It refuses to capture input if no session
-or seat can be identified.
-
 `buckle-libinput` needs read access to `/dev/input/event*`, and running it as
 root is no answer: it then no longer reaches the sound daemon of your session.
 A udev rule is installed which grants that access to whoever is logged in at
@@ -140,6 +133,23 @@ $ sudo udevadm trigger --subsystem-match=input --action=change
 Read the comments in the rule before you do: that access lets any process of
 yours read every keystroke on the machine, passwords typed into other
 programs included.  Delete the flag file and trigger again to take it back.
+
+Armed, the rule hands that access to the active session on the local seat,
+and buckle holds itself to the same bargain: it asks logind which session it
+belongs to, reads the input devices of that session's seat, and does so only
+while the session is active.  Switch to another virtual console, or let
+another user take the seat, and it closes the devices again and drops what it
+had buffered along with any key it was repeating.  Logind takes its grant
+back at that moment too, but a grant is looked at when a device is opened and
+not after, so a program already holding the devices open would otherwise go
+on reading them from behind whoever has the seat now.
+
+A seated session is what it looks for, that being where the input devices
+are.  Started by your systemd user instance, as the units shipped here are,
+it is in no session of its own; in a session on no seat, an ssh login for
+one, there is nothing to read.  In both cases it falls back to the graphical
+session of the user running it, and if there is no session to be had it says
+so and stops.
 
 #### The tray icon
 
