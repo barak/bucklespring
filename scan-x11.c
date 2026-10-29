@@ -63,7 +63,7 @@ int scan(int verbose)
 	}
 
 	rr->device_events.first = KeyPress;
-	rr->device_events.last = ButtonReleaseMask;
+	rr->device_events.last = ButtonRelease;
 	rcs = XRecordAllClients;
 
 	rc = XRecordCreateContext (dpy, 0, &rcs, 1, &rr, 1);

@@ -1,0 +1,194 @@
+#include <assert.h>
+
+#include "../scan-libinput.c"
+
+static int session_active = 1;
+static int monitor_pending;
+static int polls;
+static int poll_error;
+static int queued;
+static int played;
+static int destroyed;
+static int suspended;
+static int compositor_period_ms = REPEAT_PERIOD_MS;
+static char event;
+static char keyboard_event;
+static enum libinput_event_type event_type = LIBINPUT_EVENT_KEYBOARD_KEY;
+
+int sd_session_is_active(const char *session)
+{
+	assert(strcmp(session, "test-session") == 0);
+	return session_active;
+}
+
+/*
+ * glibc declares poll() with access(write_only, 1, 2), so reading the array
+ * in a definition of our own reads what the compiler has been told is only
+ * ever written.  The caller is scan-libinput.c, included above, and it does
+ * fill in the descriptor before asking.
+ */
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+
+int poll(struct pollfd *fds, nfds_t count, int timeout)
+{
+	assert(count == 1 && timeout == 0 && fds[0].fd == 42);
+	polls++;
+	if(poll_error) {
+		errno = EIO;
+		return -1;
+	}
+	fds[0].revents = monitor_pending ? POLLIN : 0;
+	return monitor_pending;
+}
+
+#pragma GCC diagnostic pop
+
+int libinput_dispatch(struct libinput *li) { return 0; }
+
+struct libinput_event *libinput_get_event(struct libinput *li)
+{
+	if(!queued) return NULL;
+	queued--;
+	return (struct libinput_event *)&event;
+}
+
+enum libinput_event_type libinput_event_get_type(struct libinput_event *ev)
+{
+	return event_type;
+}
+
+struct libinput_event_keyboard *libinput_event_get_keyboard_event(struct libinput_event *ev)
+{
+	return (struct libinput_event_keyboard *)&keyboard_event;
+}
+
+enum libinput_key_state libinput_event_keyboard_get_key_state(struct libinput_event_keyboard *ev)
+{
+	return LIBINPUT_KEY_STATE_PRESSED;
+}
+
+uint32_t libinput_event_keyboard_get_key(struct libinput_event_keyboard *ev)
+{
+	return KEY_A;
+}
+
+void libinput_event_destroy(struct libinput_event *ev) { destroyed++; }
+void libinput_suspend(struct libinput *li) { suspended++; queued++; }
+int play(int code, int press) { played++; return 0; }
+int repeat_enabled(void) { return 1; }
+int mouse_enabled(int which) { return 1; }
+void repeat_override(int *delay, int *period) {}
+void printd(const char *fmt, ...) {}
+int wl_repeat_open(void) { return -1; }
+int wl_repeat_dispatch(void) { return 0; }
+int wl_repeat_get(int *delay, int *period)
+{
+	*period = compositor_period_ms;
+	return 1;
+}
+
+int main(void)
+{
+	int fd = open_restricted("/dev/null", O_RDONLY, "test-session");
+	assert(fd >= 0);
+	close_restricted(fd, "test-session");
+
+	/* With nothing for the monitor to report, an event is played. */
+
+	queued = 1;
+	assert(handle_events(NULL, 42) == 0);
+	assert(played == 1 && destroyed == 1 && repeat_key == KEY_A);
+
+	/* A device is not opened while the session is inactive, nor when
+	 * logind cannot say whether it is. */
+
+	session_active = 0;
+	assert(open_restricted("/dev/null", O_RDONLY, "test-session") == -EACCES);
+	session_active = -ENXIO;
+	assert(open_restricted("/dev/null", O_RDONLY, "test-session") == -EACCES);
+	session_active = 1;
+
+	/* Once the monitor has something to say, no event is played and no
+	 * repeat is left running: what has changed is for the main loop to
+	 * find out, and it may be about to suspend the devices. */
+
+	monitor_pending = 1;
+	const enum libinput_event_type types[] = {
+		LIBINPUT_EVENT_KEYBOARD_KEY,
+		LIBINPUT_EVENT_POINTER_BUTTON,
+		LIBINPUT_EVENT_POINTER_SCROLL_WHEEL,
+	};
+	for(unsigned int i = 0; i < sizeof types / sizeof types[0]; i++) {
+		event_type = types[i];
+		queued = 1;
+		repeat_key = KEY_A;
+		assert(handle_events(NULL, 42) == 0);
+		assert(played == 1 && repeat_key == -1);
+	}
+
+	repeat_key = KEY_A;
+	repeat_after(0);
+	assert(repeat_dispatch(42) == 0);
+	assert(played == 1 && repeat_key == -1);
+
+	/* And with the monitor quiet again, both sound. */
+
+	monitor_pending = 0;
+	event_type = LIBINPUT_EVENT_KEYBOARD_KEY;
+	queued = 1;
+	assert(handle_events(NULL, 42) == 0);
+	assert(played == 2 && repeat_key == KEY_A);
+
+	repeat_after(0);
+	assert(repeat_dispatch(42) == 0);
+	assert(played == 3 && repeat_key == KEY_A);
+
+	int before = destroyed;
+	queued = 2;
+	suspend_input(NULL);
+	assert(suspended == 1 && queued == 0 && destroyed == before + 3);
+	assert(played == 3 && repeat_key == -1);
+
+	/* A monitor that cannot be polled is reported rather than guessed at. */
+
+	poll_error = 1;
+	queued = 1;
+	assert(handle_events(NULL, 42) == -EIO);
+	assert(played == 3);
+	repeat_key = KEY_A;
+	repeat_after(0);
+	assert(repeat_dispatch(42) == -EIO);
+	assert(played == 3 && repeat_key == -1);
+
+	/* An event that makes no sound is dropped without asking the monitor
+	 * at all, which is why the failing poll above goes unnoticed here. */
+
+	event_type = LIBINPUT_EVENT_POINTER_MOTION;
+	queued = 2;
+	before = destroyed;
+	int before_polls = polls;
+	assert(handle_events(NULL, 42) == 0);
+	assert(polls == before_polls && destroyed == before + 2);
+	assert(played == 3);
+
+	/* A key held while the repeat is turned off stops repeating. */
+
+	poll_error = 0;
+	repeat_key = KEY_A;
+	repeat_after(0);
+	compositor_period_ms = 0;
+	repeat_refresh();
+	assert(repeat_key == -1 && repeat_timeout() == -1);
+	assert(repeat_dispatch(42) == 0 && played == 3);
+
+	compositor_period_ms = REPEAT_PERIOD_MS;
+	repeat_refresh();
+	assert(repeat_key == -1);
+	event_type = LIBINPUT_EVENT_KEYBOARD_KEY;
+	queued = 1;
+	assert(handle_events(NULL, 42) == 0);
+	assert(played == 4 && repeat_key == KEY_A);
+	return 0;
+}
