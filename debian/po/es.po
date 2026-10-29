@@ -1,0 +1,101 @@
+# bucklespring po-debconf translation to Spanish.
+# Copyright (C) 2026 Software in the Public Interest, Inc.
+# This file is distributed under the same license as the bucklespring package.
+# Changes:
+# - Initial translation
+#       Fierro Viejo <fierroviejo@fierroviejo.com>, 2026.
+#
+#  Traductores, si no conoce el formato PO, merece la pena leer la
+#  documentación de gettext, especialmente las secciones dedicadas a este
+#  formato, por ejemplo ejecutando:
+#         info -n '(gettext)PO Files'
+#         info -n '(gettext)Header Entry'
+#
+# Equipo de traducción al español, por favor lean antes de traducir
+# los siguientes documentos:
+#
+# - El proyecto de traducción de Debian al español
+#   http://www.debian.org/intl/spanish
+#   especialmente las notas de traducción en
+#   http://www.debian.org/intl/spanish/notas
+#
+# - La guía de traducción de po's de debconf:
+#   /usr/share/doc/po-debconf/README-trans
+#   o http://www.debian.org/intl/l10n/po-debconf/README-trans
+#
+# Si tiene dudas o consultas sobre esta traducción consulte con el último
+# traductor (campo Last-Translator) y ponga en copia a la lista de
+# traducción de Debian al español (<debian-l10n-spanish@lists.debian.org>)
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: bucklespring 1.5.1+git.1.e41a021-2\n"
+"Report-Msgid-Bugs-To: bucklespring@packages.debian.org\n"
+"POT-Creation-Date: 2026-09-02 09:18+0100\n"
+"PO-Revision-Date: 2026-10-09 17:03-0600\n"
+"Last-Translator: Fierro Viejo <fierroviejo@fierroviejo.com>\n"
+"Language-Team: Spanish Localization <debian-l10n-spanish@lists.debian.org>\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 3.6\n"
+
+#. Type: boolean
+#. Description
+#: ../bucklespring-libinput.templates:1001
+msgid "Let the user at the local seat read the input devices?"
+msgstr ""
+"¿Permitir que el usuario en la estación local lea los dispositivos de "
+"entrada?"
+
+#. Type: boolean
+#. Description
+#: ../bucklespring-libinput.templates:1001
+msgid ""
+"buckle-libinput reads key and mouse events straight from /dev/input, which "
+"ordinarily only root and members of the \"input\" group may do. This package "
+"ships a udev rule that hands the keyboard and pointer devices to whoever is "
+"physically logged in at the local seat, as an ACL which systemd-logind adds "
+"at login and takes away again at logout. The rule stays inert unless it is "
+"enabled here."
+msgstr ""
+"buckle-libinput lee eventos de teclado y ratón directamente desde /dev/"
+"input, algo que normalmente únicamente pueden hacer el usuario root y los "
+"miembros del grupo «input». Este paquete incluye una regla udev que asigna "
+"los dispositivos de teclado y puntero a quien haya iniciado sesión "
+"físicamente en la estación local, mediante una ACL que systemd-logind aplica "
+"al iniciar sesión y retira al cerrarla. La regla permanece inactiva a menos "
+"que se habilite aquí."
+
+#. Type: boolean
+#. Description
+#: ../bucklespring-libinput.templates:1001
+msgid ""
+"Enabling it has a real cost: every process that user runs can then read "
+"every keystroke on the machine, including passwords typed into other "
+"applications. Bucklespring is a toy that makes a keyboard sound like an IBM "
+"Model M, so only agree if you are content to pay that price for the noise."
+msgstr ""
+"Habilitarlo conlleva un coste real: cualquier proceso que ejecute el usuario "
+"podrá leer todas las pulsaciones de teclas del equipo, incluidas las "
+"contraseñas introducidas en otras aplicaciones. Bucklespring es una "
+"aplicación lúdica que hace que el teclado suene como un IBM Model M, así que "
+"únicamente acepte si acepta pagar ese precio a cambio del sonido."
+
+#. Type: boolean
+#. Description
+#: ../bucklespring-libinput.templates:1001
+msgid ""
+"The answer is stored as the presence or absence of the file /etc/"
+"bucklespring/uaccess, which is rewritten from this answer every time the "
+"package is configured. Create or delete that file by hand for a temporary "
+"change, and run \"udevadm trigger --subsystem-match=input --action=change\" "
+"afterwards so that it reaches devices which are already plugged in."
+msgstr ""
+"La respuesta se almacena según la presencia o ausencia del fichero /etc/"
+"bucklespring/uaccess, el cual se regenera a partir de dicha respuesta cada "
+"vez que se configura el paquete. Cree o elimine ese archivo manualmente para "
+"realizar un cambio temporal, y a continuación ejecute «udevadm trigger --"
+"subsystem-match=input --action=change» para que el cambio afecte a los "
+"dispositivos que ya están conectados."
