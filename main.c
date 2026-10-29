@@ -239,16 +239,6 @@ int main(int argc, char **argv)
 		open_console();
 	}
 
-	/* Path to data files can also be specified by environment, this is
-	 * used by the snap package */
-
-	const char *env_path = getenv("BUCKLESPRING_WAV_DIR");
-	if (env_path) {
-		opt_path_audio = env_path;
-	}
-
-	printd("Using wav dir: \"%s\"\n", opt_path_audio);
-
 	/* Create openal context */
 
 	if (!opt_device) {
@@ -264,6 +254,16 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 	pthread_mutex_unlock(&audio_lock);
+
+	/* Path to data files can also be specified by environment, this is
+	 * used by the snap package */
+
+	const char *env_path = getenv("BUCKLESPRING_WAV_DIR");
+	if (env_path) {
+		opt_path_audio = env_path;
+	}
+
+	printd("Using wav dir: \"%s\"\n", opt_path_audio);
 
 #ifdef HAVE_TRAY
 	/*
@@ -435,7 +435,7 @@ void buckle_audio_devices_free(char **list)
 }
 
 
-/* The audio helpers expect audio_lock to be held. */
+/* All three expect audio_lock to be held. */
 
 static void audio_forget_sources(void)
 {
@@ -445,35 +445,11 @@ static void audio_forget_sources(void)
 		if(src[i] != 0 && src[i] != SRC_INVALID) {
 			alDeleteSources(1, &src[i]);
 		}
-		src[i] = 0;
-	}
-	for(i = 0; i < sizeof buf / sizeof *buf; i++) {
 		if(buf[i] != 0) {
 			alDeleteBuffers(1, &buf[i]);
 		}
+		src[i] = 0;
 		buf[i] = 0;
-	}
-}
-
-
-static void audio_load_buffers(void)
-{
-	int i;
-
-	for(i = 0; i < sizeof buf / sizeof *buf; i++) {
-		char fname[256];
-		snprintf(fname, sizeof fname, "%s/%02x-%d.wav",
-				opt_path_audio, i % 256, i / 256);
-		if(access(fname, F_OK) < 0) {
-			continue;
-		}
-
-		printd("Loading audio file \"%s\"", fname);
-		buf[i] = alureCreateBufferFromFile(fname);
-		if(buf[i] == 0) {
-			fprintf(stderr, "Error opening audio file \"%s\": %s\n",
-					fname, alureGetErrorString());
-		}
 	}
 }
 
@@ -501,7 +477,6 @@ static int audio_open(const char *name)
 	alListener3f(AL_POSITION, 0, 0, 0);
 	alListener3f(AL_VELOCITY, 0, 0, 0);
 	alListenerfv(AL_ORIENTATION, ori);
-	audio_load_buffers();
 
 	return 0;
 }
@@ -703,9 +678,10 @@ const char *buckle_audio_device(void)
 
 
 /*
- * Move to another output device, reloading its buffers before playback resumes.
- * On failure the old device is reopened, as having no device at all would leave
- * the program running and silent with no way back.
+ * Move to another output device.  The samples are bound to sources which
+ * belong to the old context, so they go with it and play() loads them again
+ * on demand.  On failure the old device is reopened, as having no device at
+ * all would leave the program running and silent with no way back.
  */
 
 int buckle_set_audio_device(const char *name)
@@ -844,7 +820,7 @@ static void handle_mute_key(int mute_key)
 
 
 /*
- * Play the preloaded sample for the given keycode.
+ * Play audio file for given keycode. Wav files are loaded on demand
  */
 
 int play(int code, int press)
@@ -864,18 +840,27 @@ int play(int code, int press)
 	int idx = code + press * 256;
 
 	if(src[idx] == 0) {
-		ALuint buffer = buf[idx];
-		if(buffer == 0 && opt_fallback_sound) {
-			buffer = buf[0x31 + press * 256];
-		}
-		if(buffer == 0) {
-			if(!opt_fallback_sound) {
-				fprintf(stderr, "No audio sample \"%s/%02x-%d.wav\"\n",
-						opt_path_audio, code, press);
+
+		char fname[256];
+		snprintf(fname, sizeof(fname), "%s/%02x-%d.wav", opt_path_audio, code, press);
+
+		printd("Loading audio file \"%s\"", fname);
+
+		buf[idx] = alureCreateBufferFromFile(fname);
+		if(buf[idx] == 0) {
+
+			if(opt_fallback_sound) {
+				snprintf(fname, sizeof(fname), "%s/%02x-%d.wav", opt_path_audio, 0x31, press);
+				buf[idx] = alureCreateBufferFromFile(fname);
+			} else {
+				fprintf(stderr, "Error opening audio file \"%s\": %s\n", fname, alureGetErrorString());
 			}
-			src[idx] = SRC_INVALID;
-			pthread_mutex_unlock(&audio_lock);
-			return -1;
+
+			if(buf[idx] == 0) {
+				src[idx] = SRC_INVALID;
+				pthread_mutex_unlock(&audio_lock);
+				return -1;
+			}
 		}
 	
 		alGenSources((ALuint)1, &src[idx]);
@@ -887,7 +872,7 @@ int play(int code, int press)
 		}
 		alSourcef(src[idx], AL_GAIN, opt_gain / 100.0);
 
-		alSourcei(src[idx], AL_BUFFER, buffer);
+		alSourcei(src[idx], AL_BUFFER, buf[idx]);
 		TEST_ERROR("buffer binding");
 	}
 

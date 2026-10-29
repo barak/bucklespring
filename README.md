@@ -258,10 +258,6 @@ Bucklespring uses the OpenAL library for mixing samples and providing a
 realistic 3D audio playback. This section contains some tips and tricks for
 properly tuning OpenAL for bucklespring.
 
-Samples are preloaded at startup and when switching audio devices, so typing
-does not wait for WAV files to load. Restart or switch devices to reload changed
-samples.
-
 * The default OpenAL settings can cause a slight delay in playback. Edit or create
   the OpenAL configuration file `~/.alsoftrc` and add the following options:
 
