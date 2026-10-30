@@ -1,6 +1,9 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: bucklespring
-Source: https://github.com/zevv/bucklespring
+Source: https://github.com/barak/bucklespring
+Comment: The project began at https://github.com/zevv/bucklespring, which is
+ where every release up to 1.5.1 came from; the 2.x releases are made from
+ the repository above, which is what debian/watch follows.
 
 Files: *
 Copyright: 2016-2025 Ico Doornekamp <ico@zevv.nl>
@@ -25,7 +28,7 @@ Files: configure.ac
        tools/make-clips.py
        systemd/*
        udev/*
-Copyright: 2026 Barak A. Pearlmutter <bap@debian.org>
+Copyright: 2026 Barak A. Pearlmutter <barak@pearlmutter.net>
 License: GPL-2+
 Comment: The build system, the system tray icon, the Wayland repeat rate
  query, the systemd user units and the uaccess udev rule began as Debian
@@ -38,13 +41,15 @@ Comment: The test for the libinput flavour's login session handling, from
  the fork where that handling was written.
 
 Files: man/*
-Copyright: 2016-2017 Dominik George <nik@naturalnet.de>
+Copyright: 2016-2025 Ico Doornekamp <ico@zevv.nl>
+           2016-2017 Dominik George <nik@naturalnet.de>
            2026 Barak A. Pearlmutter <bap@debian.org>
 License: GPL-2+
 Comment: The pages for the executables are generated from their own --help
- and --version output by help2man(1); the prose around the option list, in
- the matching .h2m include files, was first written for the Debian package
- by Dominik George.
+ and --version output by help2man(1), so the option list and the AUTHOR and
+ COPYRIGHT sections of each page are that program's text; the prose around
+ them, in the matching .h2m include files, was first written for the Debian
+ package by Dominik George.
 
 Files: clips/bucklespring/*
 Copyright: 2016-2025 Ico Doornekamp <ico@zevv.nl>
@@ -78,8 +83,8 @@ Files: clips/drums/*
        clips/slapstick/*
 Copyright: 2026 Barak A. Pearlmutter <bap@debian.org>
 License: GPL-2+
-Comment: Not recordings of anything: these are synthesised by
- tools/make-clips.py, which is in the source and can remake them.
+Comment: Entirely synthesised by tools/make-clips.py, which is in the
+ source and can regenerate them.
 
 Files: debian/*
 Copyright: 2016-2017 Dominik George <nik@naturalnet.de>
@@ -87,6 +92,17 @@ Copyright: 2016-2017 Dominik George <nik@naturalnet.de>
                 Andreas Tille <tille@debian.org>
            2026 Barak A. Pearlmutter <bap@debian.org>
 License: GPL-2+
+
+Files: debian/po/*
+Copyright: 2026 poc senderi <pocsenderi@protonmail.com>
+           2026 Helge Kreutzmann <debian@helgefjell.de>
+           2026 Software in the Public Interest, Inc.
+           2026 Américo Monteiro <a_monteiro@gmx.com>
+License: GPL-2+
+Comment: The debconf translations, each sent in by its translator through
+ the bug tracker: ca.po, de.po, es.po and pt.po in that order.  es.po names
+ its holder as the Spanish translation team has it, Software in the Public
+ Interest, rather than the translator, Fierro Viejo.
 
 License: GPL-2+
  This package is free software; you can redistribute it and/or modify

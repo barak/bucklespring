@@ -1,17 +1,21 @@
 bucklespring (2.0.1-1) unstable; urgency=medium
 
   * New upstream version 2.0.1
-    - buckle-libinput reads the input devices of its own login session's
-      seat, and only while that session is active
-    - upstream ChangeLog
-  * Build-depend on libsystemd-dev, for the above.
-  * README.Debian: revoking the udev grant does not reach a program that
-    already has the devices open, which is what the above is for; and the
-    input group is no longer an alternative for this flavour, which now
-    needs logind either way.
+    - buckle-libinput deactivates when session is not active
+  * Build-depend on libsystemd-dev, needed to sense session activity
+  * buckle-libinput README.Debian: edit for clarity; mention (a) that
+    revoking the udev grant does not affect a program that has the devices
+    open, and (b) that granting access via the input group might not work
+    anymore.
+  * buckle-x11 README.Debian: edit for clarity
   * Swizzle debian/watch
+  * Address issues raised in the DFSG NEW queue review of 2.0.0-1:
+    - swizzle stale upstream pointers in debian/copyright, debian/control,
+      and debian/upstream/metadata
+    - debian/copyright: add or update stanzas for man/*, debian/po/*, and
+      various directories in clips/
 
- -- Barak A. Pearlmutter <bap@debian.org>  Thu, 29 Oct 2026 22:46:41 +0000
+ -- Barak A. Pearlmutter <bap@debian.org>  Fri, 30 Oct 2026 11:31:26 +0000
 
 bucklespring (2.0.0-1) unstable; urgency=medium
 

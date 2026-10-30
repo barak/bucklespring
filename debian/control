@@ -16,7 +16,7 @@ Build-Depends: debhelper-compat (= 14),
 Standards-Version: 4.7.4
 Vcs-Git: https://salsa.debian.org/debian/bucklespring.git
 Vcs-Browser: https://salsa.debian.org/debian/bucklespring
-Homepage: https://github.com/zevv/bucklespring
+Homepage: https://github.com/barak/bucklespring
 
 # Either flavour can be left out of a build with a profile:
 #
@@ -138,13 +138,13 @@ Description: Nostalgia bucklespring keyboard sound - synthesised clips
  Bucklespring emulates the sound of an old IBM Model-M space saver
  bucklespring keyboard while typing.
  .
- This package contains the clip sets which are generated rather than
- recorded: "piano", a pentatonic scale rising from left to right across the
- keyboard; "drums", a kick, snare, hat or tom per key; "slapstick", boings
- and slide whistles; and "beeper", a single beep for a Model M with its PC
- speaker wired up.
+ This package contains the clip sets which are not recordings of a
+ keyboard: "piano", a pentatonic scale rising from left to right across the
+ keyboard; "drums", a kick, snare, hat or tom per key; and "slapstick",
+ boings and slide whistles.  The three are made by tools/make-clips.py in
+ the source, so any of them can be remade or altered.
  .
- They are made by tools/make-clips.py in the source, so any of them can be
- remade or altered.
+ It also contains "beeper", a single beep for a Model M with its PC speaker
+ wired up, which is a recording rather than synthesised.
  .
  Select one with "buckle --clips=piano" or from the preferences window.

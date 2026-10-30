@@ -2,17 +2,16 @@ bucklespring-libinput and access to the keyboard devices
 ========================================================
 
 The executable in this package, buckle-libinput, reads key events straight
-from the raw input devices in /dev/input through libinput, rather than from
-X11, so that it also works under a Wayland compositor and on the console.
-It is registered as an alternative for /usr/games/buckle, so with both
-flavours installed pick it with
+from the raw input devices in /dev/input using libinput, so that it also works
+under a Wayland compositor and on the console. It is registered as an
+alternative for /usr/games/buckle, so with buckle-x11 installed pick it with
 
   # update-alternatives --config buckle
 
 The input devices are root:input 0660, so out of the box buckle-libinput can
-only read them as root. Running it as root is no good either, as then cannot
-find the PulseAudio/PipeWire socket of your session so cannot play audio.
-Input device access has to be granted to the normal user.
+only read them as root. Running it as root is no good either, as then it
+cannot connect to the audio socket of your session so cannot play sounds.
+Therefore input device access needs to be granted to the user.
 
 Any way of doing that has security implications: processes able to read
 /dev/input/event* can log every keystroke on the machine, including passwords
@@ -32,32 +31,31 @@ the local seat. Access is limited to that active local session and is revoked
 at logout, so remote or background users of the machine do not get it.
 
 An ACL is looked at when a device is opened and not afterwards, so revoking it
-does not reach a program that already has the device open. buckle-libinput
-therefore holds itself to the same bargain the rule makes, whichever way the
-access was granted: it asks logind which session it belongs to, reads the
-input devices of that session's seat, and closes them again whenever the
-session is not the active one. Switch to another virtual console, or hand the
-seat to another user, and it stops reading the keyboard and drops whatever it
-had buffered.
+does not revoke access to running program that has the device open. So
+buckle-libinput asks logind which session it belongs to, reads the input
+devices of that session's seat, and closes them again whenever the session is
+not the active one. Switch to another virtual console, or if another user logs
+in at the seat, and it stops reading the keyboard and drops whatever it had
+buffered.
 
-The rule does nothing until you enable it, and enabling it is a flag file
-rather than a copy of the rule. Installing the package asks whether to turn it
-on, at medium debconf priority and defaulting to no; to change that answer
-later:
+The rule does is not active unless explicitly enabled, which is done using a
+flag file /etc/bucklespring/uaccess. This is a package configuration setting,
+medium debconf priority, defaulting to no. To change it:
 
   # dpkg-reconfigure bucklespring-libinput
 
-which creates or deletes /etc/bucklespring/uaccess and re-triggers the input
-devices for you. That answer is authoritative: the file is rewritten from it
-whenever the package is configured, so do it by hand only as a temporary
-change, and remember the trigger:
+You can activate it by hand (keeping in mind that this will not survive
+package reconfiguration, e.g., upon an upgrade):
 
   # touch /etc/bucklespring/uaccess
   # udevadm trigger --subsystem-match=input --action=change
 
-Check that it took with "getfacl /dev/input/event3" (any keyboard device),
-which should now list your user with "rw-". Taking the access away again is
-the same in reverse:
+and check that it is active with
+
+  $ getfacl /dev/input/event0 (any keyboard or mouse device)
+
+which should now list your user with "rw-". Revoking access away again is the
+same in reverse:
 
   # rm /etc/bucklespring/uaccess
   # udevadm trigger --subsystem-match=input --action=change
@@ -84,16 +82,16 @@ Narrowing the grant to a group of users
 ---------------------------------------
 
 The uaccess mechanism is per seat rather than per user: it grants to whoever
-holds the active session at the local seat, and /etc/bucklespring/uaccess is
-a switch for the whole machine. On a desktop with several accounts you may
-want only some of them to have it.
+holds the active session at the local seat, and /etc/bucklespring/uaccess is a
+switch for the whole machine. On a desktop with several accounts you may want
+only some of them to have it.
 
-That is an intersection of two facts, "is in a group" and "is logged in at
-the local seat", and the only place a privileged process gets told both is
-the PAM session stack at login. The package does not set this up, because
-installing it means editing the system authentication configuration, which is
-more than a program that makes typing noises ought to do to your machine.
-Doing it by hand is not hard.
+That is an intersection of two facts, "is in a group" and "is logged in at the
+local seat", and the only place a privileged process gets told both is the PAM
+session stack at login. The package does not set this up, because installing
+it means editing the system authentication configuration, which is more than a
+program that makes typing noises ought to do to your machine. Doing it by hand
+is not hard.
 
 Leave the debconf question answered no, so the shipped udev rule stays inert
 and logind grants nothing to anybody, and prepare the group:
@@ -183,7 +181,7 @@ Check the result with "getfacl /dev/input/event3" after a fresh login: a
 member of the group should be listed with "rw-" and anybody else not at all.
 
 Two things to know about it. Devices plugged in during a session do not get
-the ACL, as nothing runs between login and logout; log out and back in.  And
+the ACL, as nothing runs between login and logout; log out and back in. And
 two simultaneous local logins by the same user, a desktop session and a text
 console say, share the one ACL, so leaving either takes the access away from
 both until the next login.
@@ -202,6 +200,8 @@ including what to do about a login on a plain text console.
 
 Alternative: the input group
 ----------------------------
+
+(Note: this might not work anymore due to session activity detection.)
 
   # adduser <user> input
 
@@ -235,11 +235,10 @@ has a smaller vulnerability surface.
 
 Note that libinput asks for every input device on the seat while the rule
 above hands over only the keyboards and the pointers, and simply skips the
-rest; being refused those is the rule working rather than a fault, and is
-only mentioned under -v. Being refused all of them is worth saying, and
+rest; being refused those is the rule working rather than a fault, and is only
+mentioned under -v. Being refused all of them is worth saying, and
 buckle-libinput says so once, on startup, naming the rule. It keeps that to
-itself while its session is inactive, where every device is refused by
-design.
+itself while its session is inactive, where every device is refused by design.
 
 The tray icon and the preferences window
 ----------------------------------------
@@ -255,15 +254,14 @@ gnome-shell does not notice an extension installed underneath it, and a
 Wayland session cannot restart gnome-shell, so if that second command answers
 "Extension ... does not exist", log out and back in and run it again.
 
-Where nothing at all hosts the icon there is simply no icon; buckle says so
-under -v and otherwise carries on quietly. Nothing is lost but the icon: the
-menu on it holds only Pause and Quit and an entry that opens the preferences
-window, and that window is reachable by itself:
+If there's nothing to hold the icon, there is simply no icon. This is
+mentioned with --verbose turned on. You can still get the configuration menu
+with
 
   $ buckle-libinput --preferences
 
-asks the running buckle to put it up. The desktop file has that as an action,
-so a right click on the launcher offers "Bucklespring preferences", and
-SIGUSR1 does the same, for a keyboard shortcut.
+which tell the running buckle-libinput to pop it up. The desktop file has that
+as an action, so a right click on the launcher offers "Bucklespring
+preferences". SIGUSR1 does the same, for a keyboard shortcut.
 
- -- Barak A. Pearlmutter <bap@debian.org>, Mon,  5 Oct 2026 10:20:08 +0100
+ -- Barak A. Pearlmutter <bap@debian.org>, Fri, 30 Oct 2026 11:18:23 +0000
